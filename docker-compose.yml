@@ -1,0 +1,34 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse_github_analytics
+    ports:
+      - "8124:8123"  # Cambiado de 8123 a 8124
+      - "9001:9000"  # Cambiado de 9000 a 9001
+    environment:
+      CLICKHOUSE_DB: github_analytics
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    networks:
+      - github_analytics_net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana_github_analytics
+    ports:
+      - "3001:3000"  # Cambiado de 3000 a 3001
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    depends_on:
+      - clickhouse
+    networks:
+      - github_analytics_net
+
+volumes:
+  clickhouse_data:
+
+networks:
+  github_analytics_net:
