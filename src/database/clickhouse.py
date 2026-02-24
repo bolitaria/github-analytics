@@ -1,4 +1,5 @@
 from clickhouse_driver import Client
+import pandas as pd
 from src.config.settings import settings
 from src.utils.logger import logger
 
@@ -6,7 +7,7 @@ class ClickHouseClient:
     def __init__(self):
         self.client = Client(
             host=settings.CLICKHOUSE_HOST,
-            port=settings.CLICKHOUSE_PORT,
+            port=9001,  # Puerto nativo mapeado
             user=settings.CLICKHOUSE_USER,
             password=settings.CLICKHOUSE_PASSWORD,
             database=settings.CLICKHOUSE_DATABASE
@@ -27,20 +28,26 @@ class ClickHouseClient:
         columns = list(data[0].keys())
         query = f"INSERT INTO {table} ({', '.join(columns)}) VALUES"
         
-        # Preparar valores - NO convertir datetime a string
-        values = []
-        for item in data:
-            row_values = []
-            for col in columns:
-                value = item[col]
-                # ClickHouse driver maneja automáticamente los objetos datetime
-                row_values.append(value)
-            values.append(tuple(row_values))
+        values = [tuple(item[col] for col in columns) for item in data]
         
         try:
             self.client.execute(query, values)
         except Exception as e:
             logger.error(f"Error in batch insert: {e}")
             raise
+
+    def query_dataframe(self, query: str, params=None):
+        """
+        Ejecuta una consulta y devuelve un pandas DataFrame.
+        """
+        try:
+            rows, columns = self.client.execute(query, params, with_column_types=True)
+            if not rows:
+                return pd.DataFrame()
+            df = pd.DataFrame(rows, columns=[col[0] for col in columns])
+            return df
+        except Exception as e:
+            logger.error(f"Error in query_dataframe: {e}")
+            return pd.DataFrame()
 
 clickhouse_client = ClickHouseClient()
