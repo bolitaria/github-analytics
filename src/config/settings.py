@@ -15,6 +15,9 @@ class Settings:
     
     GITHUB_API_BASE_URL = "https://api.github.com"
     GITHUB_RATE_LIMIT_DELAY = 1
+
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'tu-secreto-super-seguro')
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv('JWT_ACCESS_TOKEN_EXPIRE_MINUTES', 1440))
     
     @property
     def has_github_token(self):
