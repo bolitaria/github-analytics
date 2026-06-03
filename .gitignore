@@ -1,25 +1,148 @@
-# Virtual environment
-venv/
-env/
+# =======================
+# 1. Python específico
+# =======================
+# Archivos de caché y compilación
+*.py[cod]
+*.so
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
 
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+# Distribuciones y empaquetado
+build/
+dist/
+*.egg-info/
+*.egg
+MANIFEST
 
-# IDE
-.vscode/
-.idea/
+# Entornos virtuales (ya tienes venv/, env/ – pero añado otros)
+.envrc
+.venv
+virtualenv/
 
-# Environment variables
-.env
+# =======================
+# 2. Testing y cobertura
+# =======================
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+.benchmarks/
+.cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
 
-# Logs
+# =======================
+# 3. Modelos de ML (¡crítico!)
+# =======================
+models/*.pkl
+models/*.joblib
+models/*.h5
+models/*.pickle
+*.model
+*.weights
+
+# =======================
+# 4. Jupyter Notebooks (si usas)
+# =======================
+.ipynb_checkpoints/
+*.ipynb
+# pero si quieres conservar notebooks de ejemplo, mejor excluir directorio:
+notebooks/
+
+# =======================
+# 5. Datos (evitar commits grandes)
+# =======================
+data/
+*.csv
+*.parquet
+*.jsonl
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+backup_*.csv
+sample_*.json
+
+# =======================
+# 6. Archivos sensibles / secretos
+# =======================
+.env.local
+.env.production
+.secrets
+*.pem
+*.key
+*.crt
+*.pub   # ya tienes key.pub, pero añado *.pub general
+*.p12
+cert.pem
+key.pem
+
+# =======================
+# 7. Logs y reportes
+# =======================
 *.log
+*.log.*
 logs/
+scheduler.log
+audit.log
+ci_health_report.md   # si generas informes automáticos, no versionarlos
 
-# Docker
-docker-compose.override.yml
-key
-key.pub
+# =======================
+# 8. Entornos de contenedores / volúmenes locales
+# =======================
+# Docker compose override (ya tienes docker-compose.override.yml)
+# Volúmenes persistentes (normalmente fuera del repo)
+clickhouse_data/
+grafana_data/
+mysql_data/
+postgres_data/
+*.tar
+*.gz
+
+# =======================
+# 9. Archivos de sistema operativo
+# =======================
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# =======================
+# 10. Editores y herramientas (complemento)
+# =======================
+*.swp
+*.swo
+*~
+.~lock.*
+.vscode/    # ya lo tienes
+.idea/      # ya lo tienes
+*.sublime-*
+.project
+.pydevproject
+
+# =======================
+# 11. Archivos temporales y de backup
+# =======================
+*.tmp
+temp/
+*.bak
+*.backup
+*.old
+*.orig
+
+# =======================
+# 12. Grafana local (si exportas dashboards o provisioning)
+# =======================
+grafana/provisioning/datasources/*.yaml   # si quieres evitar subir credenciales
+# pero normalmente sí subes la estructura, solo evita archivos con secretos
+
+# =======================
+# 13. Logs de GitHub Actions (locales)
+# =======================
+.github/workflows/logs/
