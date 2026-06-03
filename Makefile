@@ -175,15 +175,15 @@ init: up
 	@echo "$(GREEN)Initializing ClickHouse...$(RESET)"
 	@sleep 15  # Give ClickHouse time to start
 	@if [ -f "venv/bin/python" ]; then \
-		PYTHONPATH=/home/bolitaria/github-analytics ./venv/bin/python scripts/init_clickhouse.py; \
+		PYTHONPATH=$(PWD) ./venv/bin/python scripts/init_clickhouse.py; \
 	elif [ -f "venv/bin/python3" ]; then \
-		PYTHONPATH=/home/bolitaria/github-analytics ./venv/bin/python3 scripts/init_clickhouse.py; \
+		PYTHONPATH=$(PWD) ./venv/bin/python3 scripts/init_clickhouse.py; \
 	else \
 		echo "$(RED)❌ Cannot run Python from virtual environment$(RESET)"; \
 		exit 1; \
 	fi
 	@echo "$(GREEN)✅ Database initialized$(RESET)"
-	
+
 generate-sample-data: init
 	@echo "$(GREEN)Generating sample data...$(RESET)"
 	@if [ -f "venv/bin/python" ]; then \
@@ -268,7 +268,7 @@ status:
 	@if [ -d "venv" ]; then \
 		if [ -f "venv/bin/python" ] || [ -f "venv/bin/python3" ]; then \
 			echo "$(GREEN)✅ Virtual environment present and functional$(RESET)"; \
-			@if [ -f "venv/bin/python" ]; then \
+			if [ -f "venv/bin/python" ]; then \
 				./venv/bin/python --version | xargs echo "  Python version: "; \
 			else \
 				./venv/bin/python3 --version | xargs echo "  Python version: "; \
@@ -282,23 +282,43 @@ status:
 
 init-users:
 	@echo "$(GREEN)Initializing users...$(RESET)"
-	python scripts/init_users.py
+	@if [ -f "venv/bin/python" ]; then \
+		./venv/bin/python scripts/init_users.py; \
+	else \
+		./venv/bin/python3 scripts/init_users.py; \
+	fi
 
 export-bigquery:
 	@echo "$(GREEN)Exporting data to BigQuery...$(RESET)"
-	python scripts/export_to_bigquery.py
+	@if [ -f "venv/bin/python" ]; then \
+		./venv/bin/python scripts/export_to_bigquery.py; \
+	else \
+		./venv/bin/python3 scripts/export_to_bigquery.py; \
+	fi
 
 run-scheduler:
 	@echo "$(GREEN)Starting scheduler...$(RESET)"
-	python scripts/scheduler.py
+	@if [ -f "venv/bin/python" ]; then \
+		./venv/bin/python scripts/scheduler.py; \
+	else \
+		./venv/bin/python3 scripts/scheduler.py; \
+	fi
 
 setup-grafana:
 	@echo "$(GREEN)Configuring Grafana automatically...$(RESET)"
-	python scripts/setup_grafana.py
+	@if [ -f "venv/bin/python" ]; then \
+		./venv/bin/python scripts/setup_grafana.py; \
+	else \
+		./venv/bin/python3 scripts/setup_grafana.py; \
+	fi
 
 test-integration:
 	@echo "$(GREEN)Running integration tests...$(RESET)"
-	pytest tests/test_integration.py -v
+	@if [ -f "venv/bin/python" ]; then \
+		./venv/bin/python -m pytest tests/test_integration.py -v; \
+	else \
+		./venv/bin/python3 -m pytest tests/test_integration.py -v; \
+	fi
 
 deploy-gcp:
 	@echo "$(GREEN)Deploying to Google Cloud Run...$(RESET)"
@@ -306,7 +326,61 @@ deploy-gcp:
 
 train-model:
 	@echo "$(GREEN)Training issue classifier model...$(RESET)"
-	python scripts/train_issue_classifier.py
+	@if [ -f "venv/bin/python" ]; then \
+		./venv/bin/python scripts/train_issue_classifier.py; \
+	else \
+		./venv/bin/python3 scripts/train_issue_classifier.py; \
+	fi
+
+update-thresholds:
+	@echo "$(GREEN)Updating dynamic thresholds...$(RESET)"
+	@if [ -f "venv/bin/python" ]; then \
+		./venv/bin/python scripts/anomaly_detection.py; \
+	else \
+		./venv/bin/python3 scripts/anomaly_detection.py; \
+	fi
+
+generate-dashboard:
+	@echo "$(GREEN)Generating enterprise dashboard JSON...$(RESET)"
+	mkdir -p grafana/dashboards
+	@if [ -f "venv/bin/python" ]; then \
+		./venv/bin/python scripts/generate_dashboard.py > grafana/dashboards/enterprise.json; \
+	else \
+		./venv/bin/python3 scripts/generate_dashboard.py > grafana/dashboards/enterprise.json; \
+	fi
+
+deploy-dashboard: generate-dashboard
+	@echo "$(GREEN)Deploying dashboard to Grafana...$(RESET)"
+	@if [ -f "venv/bin/python" ]; then \
+		./venv/bin/python scripts/deploy_dashboard.py grafana/dashboards/enterprise.json; \
+	else \
+		./venv/bin/python3 scripts/deploy_dashboard.py grafana/dashboards/enterprise.json; \
+	fi
+
+enterprise-deploy: update-thresholds generate-dashboard deploy-dashboard
+	@echo "$(GREEN)✅ Enterprise dashboard deployed!$(RESET)"
+
+# Additional targets from original (kept for compatibility)
+.PHONY: generate-full-dashboard deploy-full-dashboard full-enterprise-deploy
+
+generate-full-dashboard:
+	@echo "$(GREEN)Generating full enterprise dashboard...$(RESET)"
+	@if [ -f "venv/bin/python" ]; then \
+		./venv/bin/python scripts/generate_full_dashboard.py; \
+	else \
+		./venv/bin/python3 scripts/generate_full_dashboard.py; \
+	fi
+
+deploy-full-dashboard:
+	@echo "$(GREEN)Deploying full enterprise dashboard...$(RESET)"
+	@if [ -f "venv/bin/python" ]; then \
+		./venv/bin/python scripts/generate_full_dashboard.py; \
+	else \
+		./venv/bin/python3 scripts/generate_full_dashboard.py; \
+	fi
+
+full-enterprise-deploy: update-thresholds generate-full-dashboard
+	@echo "$(GREEN)✅ Full enterprise dashboard deployed!$(RESET)"
 
 info:
 	@echo "$(GREEN)📊 GitHub Analytics Dashboard$(RESET)"
@@ -341,32 +415,3 @@ health-check:
 	@curl -f http://localhost:3001/api/health > /dev/null 2>&1 && echo "$(GREEN)✅ Grafana is responding$(RESET)" || echo "$(RED)❌ Grafana is not responding$(RESET)"
 	@echo "$(YELLOW)API:$(RESET)"
 	@curl -f http://localhost:8001/api/health > /dev/null 2>&1 && echo "$(GREEN)✅ API is responding$(RESET)" || echo "$(YELLOW)⚠️  API may not be running (start with 'python run.py')$(RESET)"
-
-generate-dashboard:
-	@echo "$(GREEN)Generating enterprise dashboard JSON...$(RESET)"
-	mkdir -p grafana/dashboards
-	python scripts/generate_dashboard.py > grafana/dashboards/enterprise.json
-
-deploy-dashboard: generate-dashboard
-	@echo "$(GREEN)Deploying dashboard to Grafana...$(RESET)"
-	python scripts/deploy_dashboard.py grafana/dashboards/enterprise.json
-
-update-thresholds:
-	@echo "$(GREEN)Updating dynamic thresholds...$(RESET)"
-	python scripts/anomaly_detection.py
-
-enterprise-deploy: update-thresholds generate-dashboard deploy-dashboard
-	@echo "$(GREEN)✅ Enterprise dashboard deployed!$(RESET)"
-
-.PHONY: generate-full-dashboard deploy-full-dashboard full-enterprise-deploy
-
-generate-full-dashboard:
-	@echo "$(GREEN)Generando dashboard enterprise completo...$(RESET)"
-	python scripts/generate_full_dashboard.py
-
-deploy-full-dashboard:
-	@echo "$(GREEN)Desplegando dashboard enterprise completo...$(RESET)"
-	python scripts/generate_full_dashboard.py   # ya hace deploy automático
-
-full-enterprise-deploy: update-thresholds generate-full-dashboard
-	@echo "$(GREEN)✅ Dashboard enterprise completo desplegado!$(RESET)"
