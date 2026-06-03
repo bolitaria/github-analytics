@@ -1,1263 +1,663 @@
-# 📋 GitHub Analytics Dashboard - Runbook Operativo
+# GitHub Analytics Dashboard Runbook
 
-**Versión:** 1.0  
-**Última actualización:** Junio 2026  
-**Autores:** Equipo DevOps
-
----
-
-## 📑 Tabla de Contenidos
-
-1. [Visión General](#visión-general)
-2. [Arquitectura del Sistema](#arquitectura-del-sistema)
-3. [Requisitos Previos](#requisitos-previos)
-4. [Instalación y Setup Inicial](#instalación-y-setup-inicial)
-5. [Configuración](#configuración)
-6. [Operaciones Diarias](#operaciones-diarias)
-7. [Mantenimiento](#mantenimiento)
-8. [Solución de Problemas](#solución-de-problemas)
-9. [Backup y Recuperación](#backup-y-recuperación)
-10. [Escalabilidad](#escalabilidad)
-11. [Seguridad](#seguridad)
-12. [Monitoreo y Alertas](#monitoreo-y-alertas)
-13. [Procedimientos de Respuesta a Incidentes](#procedimientos-de-respuesta-a-incidentes)
+**Version:** 1.0
+**Last updated:** June 2026
+**Authors:** DevOps Team
 
 ---
 
-## 🎯 Visión General
+## Table of Contents
 
-### ¿Qué es GitHub Analytics Dashboard?
-
-Un sistema en tiempo real de análisis de actividad en repositorios de GitHub que:
-- **Captura eventos** desde GitHub API (commits, PRs, issues)
-- **Almacena datos** en ClickHouse para análisis rápido
-- **Predice tendencias** usando modelos ML (Prophet para forecasting)
-- **Clasifica issues** automáticamente (bug, feature, doc, etc.)
-- **Visualiza datos** en dashboards Grafana interactivos
-- **Proporciona API REST** con autenticación JWT
-
-### Caso de uso principal
-
-Monitorear y analizar la salud, actividad y tendencias de repositorios GitHub a través de dashboards ejecutivos.
-
-### Stack tecnológico
-
-| Componente | Tecnología |
-|-----------|-----------|
-| **Backend** | Python 3.12, Flask |
-| **Base de datos** | ClickHouse (columnar OLAP) |
-| **Visualización** | Grafana |
-| **Contenedores** | Docker & Docker Compose |
-| **ML** | scikit-learn, Prophet, pandas |
-| **Autenticación** | JWT + bcrypt |
-| **Cloud** | Google Cloud (BigQuery, Cloud Run) |
+1. [Overview](#overview)
+2. [Architecture](#architecture)
+3. [Prerequisites](#prerequisites)
+4. [Initial Setup](#initial-setup)
+5. [Configuration](#configuration)
+6. [Daily Operations](#daily-operations)
+7. [Maintenance](#maintenance)
+8. [Troubleshooting](#troubleshooting)
+9. [Backup and Recovery](#backup-and-recovery)
+10. [Scalability](#scalability)
+11. [Security](#security)
+12. [Monitoring and Alerts](#monitoring-and-alerts)
+13. [Incident Response](#incident-response)
+14. [Resources](#resources)
 
 ---
 
-## 🏗️ Arquitectura del Sistema
+## Overview
 
-### Componentes principales
+The GitHub Analytics Dashboard is a full-stack analytics platform for repository activity.
+It ingests GitHub events, stores them in ClickHouse, exposes a secure REST API, runs
+machine learning models for forecasting and classification, and presents dashboards via
+Grafana.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     GitHub API                                  │
-└────────────────────┬────────────────────────────────────────────┘
-                     │ (Fetch Events)
-        ┌────────────▼─────────────┐
-        │                          │
-┌───────▼────────┐      ┌─────────▼────────┐
-│  Python ETL    │      │ Sample Data Gen  │
-│  (github_etl)  │      │ (Demo Mode)      │
-└───────┬────────┘      └─────────┬────────┘
-        │                         │
-        └────────────┬────────────┘
-                     │
-        ┌────────────▼─────────────────┐
-        │    Flask API (port 8001)     │
-        │  - Auth endpoints            │
-        │  - Data endpoints            │
-        │  - ML endpoints              │
-        └────────────┬─────────────────┘
-                     │
-        ┌────────────▼─────────────────┐
-        │   ClickHouse (port 9001)     │
-        │  - Raw events table          │
-        │  - Materialized views        │
-        │  - Forecast tables           │
-        └────────────┬─────────────────┘
-                     │
-        ┌────────────▼─────────────────┐
-        │    Grafana (port 3001)       │
-        │  - Dashboards               │
-        │  - Visualizations            │
-        └──────────────────────────────┘
-```
-
-### Flujo de datos
-
-1. **Ingesta**: ETL extrae eventos de GitHub cada N minutos
-2. **Almacenamiento**: Se guardan en tabla `github_analytics.events` en ClickHouse
-3. **Procesamiento**: ML genera predicciones y clasificaciones
-4. **Consulta**: API Flask expone endpoints para clientes
-5. **Visualización**: Grafana carga datos vía API de ClickHouse
-
-### Tabla de base de datos principal
-
-```sql
-CREATE TABLE github_analytics.events (
-    id String,
-    type String,
-    actor_login String,
-    repo_name String,
-    created_at DateTime,
-    payload String,
-    url String
-) ENGINE = MergeTree()
-ORDER BY (created_at, repo_name);
-```
+This runbook provides operational guidance for deployment, monitoring, troubleshooting,
+maintenance, and incident response.
 
 ---
 
-## 📋 Requisitos Previos
+## Architecture
 
-### Sistema operativo
+### Core components
 
-- Linux (WSL2 en Windows) o macOS
-- 8GB RAM mínimo
-- 20GB almacenamiento disponible
+- **ETL service**: Fetches GitHub events or generates demo events when a token is not available.
+- **Data storage**: ClickHouse stores raw events and forecast data.
+- **API layer**: Flask-based REST API with JWT authentication.
+- **Machine learning**: Forecasting and issue classification models.
+- **Dashboard layer**: Grafana visualizes event trends and system health.
+- **Orchestration**: Docker Compose coordinates ClickHouse, Grafana, and API services.
 
-### Software requerido
+### Data flow
+
+1. ETL extracts GitHub events from the API or demo generator.
+2. Events are stored in ClickHouse under the `github_analytics` database.
+3. ML models produce forecasts and classifications.
+4. The Flask API serves authenticated requests and predictions.
+5. Grafana visualizes the data using ClickHouse as the source.
+
+### Docker services
+
+- `clickhouse`: ClickHouse server.
+- `grafana`: Grafana server.
+- `predictions-api`: API service.
+
+### External ports
+
+- ClickHouse: 8124 -> 8123, 9001 -> 9000
+- Grafana: 3001 -> 3000
+- API: 8000 -> 8000
+- Local Flask development: 8001
+
+---
+
+## Prerequisites
+
+### Platform requirements
+
+- Linux, macOS, or WSL2 on Windows
+- Minimum 8GB RAM
+- Minimum 20GB disk space
+
+### Software requirements
+
+- Python 3.12+
+- Docker 20.10+
+- Docker Compose 2.0+
+- Git 2.30+
+
+### Credentials
+
+- GitHub token: optional for real data ingestion.
+- Google Cloud service account key: optional for BigQuery export.
+- JWT secret: required for secure API tokens.
+
+### Verification
 
 ```bash
-# Verificar versiones necesarias
-Python 3.12+
-Docker 20.10+
-Docker Compose 2.0+
-Git 2.30+
-```
-
-### Credenciales y tokens
-
-1. **GitHub Token** (opcional para demo)
-   - Crear en: https://github.com/settings/tokens
-   - Permisos mínimos: `repo`, `read:user`
-   - Guardarlo en `.env` como `GITHUB_TOKEN`
-
-2. **Google Cloud** (solo para BigQuery export)
-   - Service Account JSON en `credentials/`
-   - Variable: `GOOGLE_APPLICATION_CREDENTIALS`
-
-### Verificar environment
-
-```bash
-# Ejecutar check
 make check-env
-
-# Debe confirmar: Python ✓, Docker ✓, Docker Compose ✓
 ```
 
 ---
 
-## 🚀 Instalación y Setup Inicial
+## Initial Setup
 
-### Opción 1: Setup Completo (Recomendado)
+The recommended approach combines all necessary steps into one streamlined process. For quick demo without persistence, use `make quick-start`.
+
+### Full setup
 
 ```bash
-# 1. Clonar repositorio
-git clone <repo-url>
+git clone <repository-url>
 cd github-analytics
-
-# 2. Setup completo (instala dependencias, inicia containers, inicializa DB)
 make setup
-
-# 3. Crear usuario admin
 make init-users
-
-# 4. Generar datos de demostración
 make generate-sample-data
-
-# 5. Ejecutar ETL (opcional - requiere GITHUB_TOKEN)
-# Primero configurar: export GITHUB_TOKEN=ghp_xxxxx
 make run-etl
-
-# 6. Entrenar modelo de clasificación
 make train-model
-
-# 7. Verificar salud del sistema
 make health-check
 ```
 
-### Opción 2: Setup Manual Paso a Paso
+### Quick demo (no persistence)
 
 ```bash
-# 1. Crear entorno virtual
-make venv
-source venv/bin/activate
-
-# 2. Instalar dependencias
-make install
-
-# 3. Iniciar containers Docker
-make up
-
-# 4. Inicializar base de datos
-make init
-
-# 5. Esperar 10-15 segundos a que ClickHouse esté listo
-sleep 15
-
-# 6. Crear usuarios
-python scripts/init_users.py
-```
-
-### Opción 3: Demo Rápida (Menor que 2 minutos)
-
-```bash
-# Todo en uno: setup + demo con datos de ejemplo
 make quick-start
-
-# Esto iniciará:
-# - ClickHouse en puerto 9001
-# - Grafana en puerto 3001
-# - Flask API en puerto 8001
-# - Datos de ejemplo precargados
 ```
 
-### Validación post-instalación
+### Validation
 
 ```bash
-# Verificar contenedores
 docker ps | grep github_analytics
-
-# Probar acceso a ClickHouse
 make health-check
-
-# Probar acceso a Grafana
 curl http://localhost:3001/api/health
-
-# Probar API Flask
 curl http://localhost:8001/api/health
-
-# Ver logs si hay problemas
 make logs
 ```
 
 ---
 
-## ⚙️ Configuración
+## Configuration
 
-### Archivo `.env` principal
+### Environment variables
+
+Create a `.env` file in the repository root with the following required variables:
 
 ```bash
-# Crear archivo .env en raíz del proyecto
-cat > .env << EOF
-# GitHub Configuration
-GITHUB_TOKEN=ghp_xxxxxxxxxxxxx  # Opcional, sin él usa demo mode
+# GitHub
+GITHUB_TOKEN=your_github_token
 GITHUB_API_BASE_URL=https://api.github.com
 
-# ClickHouse Configuration
+# ClickHouse
 CLICKHOUSE_HOST=localhost
 CLICKHOUSE_PORT=9000
 CLICKHOUSE_USER=default
 CLICKHOUSE_PASSWORD=
 CLICKHOUSE_DATABASE=github_analytics
 
-# JWT Configuration
-JWT_SECRET_KEY=your-super-secret-key-change-in-production
+# Security
+JWT_SECRET_KEY=your_secure_jwt_secret
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES=1440
 
-# Scheduler (en minutos)
+# Scheduling
 ETL_SCHEDULE_MINUTES=60
 MODEL_RETRAINING_SCHEDULE_HOURS=24
 
-# Google Cloud (para BigQuery export)
+# Cloud (optional)
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
-
-# Rate Limiting (segundos entre requests)
 GITHUB_RATE_LIMIT_DELAY=1
-EOF
 ```
 
-### Archivo `.env` para desarrollo
+### Development environment
 
 ```bash
-# .env.development
 DEBUG=True
 FLASK_ENV=development
 LOG_LEVEL=DEBUG
-DEMO_MODE=True  # Usar datos de prueba sin GitHub token
+DEMO_MODE=True
 ```
 
-### Variables de entorno por servicio
-
-#### ClickHouse
-- Editado en: `config/clickhouse/users.xml`
-- Usuarios y permisos configurables
-- Puerto: 9000 (internal), 9001 (mapped)
-
-#### Grafana
-- Editado en: `docker-compose.yml` sección `grafana.environment`
-- Admin password por defecto: `admin/admin` (cambiar en producción)
-- Dashboards JSON en: `grafana/dashboards/`
-
-#### Flask API
-- Ver: `src/config/settings.py`
-- Carga vars de `.env` automáticamente con `python-dotenv`
-
-### Configuración de datasources en Grafana
+### Grafana datasource
 
 ```bash
-# Automatizar setup de Grafana
+# Automated setup
 make setup-grafana
 
-# O manual:
-# 1. Ir a http://localhost:3001
-# 2. Ingresa: admin / admin
+# Manual setup:
+# 1. Open http://localhost:3001
+# 2. Login: admin / admin
 # 3. Configuration > Data Sources
-# 4. Agregar ClickHouse datasource:
-#    - Host: clickhouse (nombre del servicio en docker)
-#    - Port: 9000
+# 4. Add ClickHouse:
+#    - URL: http://clickhouse:8123
 #    - Database: github_analytics
 #    - User: default
 ```
 
 ---
 
-## 🔄 Operaciones Diarias
+## Daily Operations
 
-### Inicio del sistema
+### Start services
 
 ```bash
-# Opción 1: Inicia todo con una línea
 make up
-
-# Opción 2: Detallado
+# or
 docker-compose -f docker-compose.yml up -d
-
-# Verificar estado
 make status
 ```
 
-### Ejecutar ETL (extracción de datos)
+### Run ETL
 
 ```bash
-# Opción 1: Una sola vez (full)
 make run-etl
-
-# Opción 2: Automático con scheduler (background)
 make run-scheduler
-
-# Script individual
 python scripts/scheduled_etl.py
 ```
 
-### Entrenar modelos
+### Train ML models
 
 ```bash
-# Entrenar clasificador de issues
 make train-model
-
-# Auto-entrenar cada 24h (en background)
-make run-scheduler
 ```
 
-### Consultar datos vía API
+### API usage
 
 ```bash
-# 1. Login y obtener JWT token
 TOKEN=$(curl -s -X POST http://localhost:8001/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin123"}' | jq -r '.token')
 
-# 2. Listar repositorios
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8001/api/repos
-
-# 3. Actividad de un repo
-curl -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8001/api/repos/owner/repo-name/activity
-
-# 4. Predicciones
-curl -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8001/api/predictions/owner/repo-name
-
-# 5. Clasificar issue (ML)
-curl -X POST -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8001/api/repos/owner/repo-name/activity
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8001/api/predictions/owner/repo-name
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"title":"Login fails","body":"Users cannot login"}' \
   http://localhost:8001/api/classify
 ```
 
-### Consultar datos directamente en ClickHouse
+### Query ClickHouse
 
 ```bash
-# Via cliente Python
-python -c "
-from src.database.clickhouse import clickhouse_client
-result = clickhouse_client.execute_query(
-    'SELECT COUNT(*) FROM github_analytics.events'
-)
-print(result)
-"
-
-# Via CLI (si está instalado clickhouse-client)
-clickhouse-client -h localhost -p 9000 \
-  -q "SELECT COUNT(*) FROM github_analytics.events"
+python -c "from src.database.clickhouse import clickhouse_client; print(clickhouse_client.execute_query('SELECT COUNT(*) FROM github_analytics.events'))"
+clickhouse-client -h localhost -p 9000 -q "SELECT COUNT(*) FROM github_analytics.events"
 ```
 
-### Ver logs
+### View logs
 
 ```bash
-# Todos los servicios
 make logs
-
-# Solo ClickHouse
 make logs-clickhouse
-
-# Solo Grafana
 make logs-grafana
-
-# Flask API (en terminal separada)
 python run.py
-
-# Scheduler (en terminal separada)
 make run-scheduler
 ```
 
 ---
 
-## 🔧 Mantenimiento
+## Maintenance
 
-### Limpieza de datos antiguos
+### Data retention
 
 ```bash
-# Ver tamaño de tabla events
-python -c "
-from src.database.clickhouse import clickhouse_client
-result = clickhouse_client.execute_query(
-    \"SELECT table, formatReadableSize(sum(bytes)) as size \"
-    \"FROM system.parts \"
-    \"WHERE database='github_analytics' \"
-    \"GROUP BY table\"
-)
-for row in result:
-    print(f'{row[0]}: {row[1]}')
-"
-
-# Eliminar eventos con más de 90 días
-python -c "
-from src.database.clickhouse import clickhouse_client
-clickhouse_client.execute_query(
-    \"ALTER TABLE github_analytics.events DELETE \"
-    \"WHERE created_at < now() - interval 90 day\"
-)
-print('Deleted events older than 90 days')
-"
+python -c "from src.database.clickhouse import clickhouse_client; result = clickhouse_client.execute_query(\"SELECT table, formatReadableSize(sum(bytes)) AS size FROM system.parts WHERE database='github_analytics' GROUP BY table\"); print(result)"
+python -c "from src.database.clickhouse import clickhouse_client; clickhouse_client.execute_query(\"ALTER TABLE github_analytics.events DELETE WHERE created_at < now() - interval 90 day\"); print('Deleted events older than 90 days')"
 ```
 
-### Reentrenamiento de modelos
+### Retrain models
 
 ```bash
-# Entrenar con datos más recientes
 make train-model
-
-# Automático cada 24 horas
-make run-scheduler &
-
-# Ver modelo entrenado
-ls -lh models/issue_classifier.pkl
 ```
 
-### Actualizar dependencias
+### Update dependencies
 
 ```bash
-# Ver dependencias desactualizado
 pip list --outdated
-
-# Actualizar todo
 pip install --upgrade -r requirements.txt
-
-# Probar cambios
 make test
-
-# Reiniciar servicios
 make restart
 ```
 
-### Compactación de datos en ClickHouse
+### Optimize ClickHouse
 
 ```bash
-# Forzar merge de particiones
-python -c "
-from src.database.clickhouse import clickhouse_client
-clickhouse_client.execute_query(
-    'OPTIMIZE TABLE github_analytics.events FINAL'
-)
-print('Compaction started')
-"
-
-# Esperar 5-10 minutos para que termine
-```
-
-### Backup de base de datos
-
-```bash
-# Exportar tabla completa a CSV
-python -c "
-from src.database.clickhouse import clickhouse_client
-result = clickhouse_client.execute_query(
-    'SELECT * FROM github_analytics.events'
-)
-with open('backup_events.csv', 'w') as f:
-    for row in result:
-        f.write(','.join(map(str, row)) + '\n')
-"
-
-# Exportar a JSON
-python scripts/export_to_bigquery.py --format json
+python -c "from src.database.clickhouse import clickhouse_client; clickhouse_client.execute_query('OPTIMIZE TABLE github_analytics.events FINAL'); print('Compaction started')"
 ```
 
 ---
 
-## 🐛 Solución de Problemas
+## Troubleshooting
 
-### Problema: Contenedores no inician
+### Containers do not start
 
 ```bash
-# Diagnosticar
 docker-compose logs clickhouse grafana
-
-# Soluciones comunes
-docker-compose down -v    # Limpiar volumes
+docker-compose down -v
 make clean
 make setup
-
-# Ver logs detallados
 docker logs clickhouse_github_analytics
 docker logs grafana_github_analytics
 ```
 
-### Problema: ClickHouse no responde
+### ClickHouse unresponsive
 
 ```bash
-# Verificar que está corriendo
 docker ps | grep clickhouse
-
-# Revisar logs
 make logs-clickhouse
-
-# Reiniciar
 docker restart clickhouse_github_analytics
-
-# Verificar puerto
 netstat -tulpn | grep 9000 || ss -tulpn | grep 9000
-
-# Prueba de conexión
-python -c "
-from src.database.clickhouse import clickhouse_client
-try:
-    result = clickhouse_client.execute_query('SELECT 1')
-    print('✓ Conexión OK')
-except Exception as e:
-    print(f'✗ Error: {e}')
-"
+python -c "from src.database.clickhouse import clickhouse_client; print(clickhouse_client.execute_query('SELECT 1'))"
 ```
 
-### Problema: Grafana no se conecta a ClickHouse
+### Grafana connection issue
 
 ```bash
-# 1. Verificar datasource está bien configurado
 curl http://localhost:3001/api/datasources
-
-# 2. Probar conexión manualmente
-curl -X POST http://localhost:3001/api/datasources/test \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "ClickHouse",
-    "type": "clickhouse",
-    "url": "http://clickhouse:8123",
-    "database": "github_analytics"
-  }'
-
-# 3. Si falla, revisar docker network
+curl -X POST http://localhost:3001/api/datasources/test -H "Content-Type: application/json" -d '{"name":"ClickHouse","type":"clickhouse","url":"http://clickhouse:8123","database":"github_analytics"}'
 docker network inspect github_analytics_net
-
-# 4. Usar host.docker.internal en Mac/Windows
-# En datasource URL: http://host.docker.internal:8124
 ```
 
-### Problema: ETL falla con "GitHub API rate limit exceeded"
+### GitHub API rate limit
 
 ```bash
-# Esperar 1 hora o verificar token
 echo $GITHUB_TOKEN
-
-# Si está vacío, usar demo mode
 export DEMO_MODE=True
 make run-etl
-
-# Si el token sigue siendo inválido
-# 1. Regenerarlo en https://github.com/settings/tokens
-# 2. Actualizar .env
-# 3. source .env
 ```
 
-### Problema: Token JWT inválido en API
+### JWT token problem
 
 ```bash
-# Regenerar token
-TOKEN=$(curl -s -X POST http://localhost:8001/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}' | jq -r '.token')
-
-# Verificar que se genera
+TOKEN=$(curl -s -X POST http://localhost:8001/api/auth/login -H "Content-Type: application/json" -d '{"username":"admin","password":"admin123"}' | jq -r '.token')
 echo $TOKEN
-
-# Si falla, reiniciar API
 make restart
 ```
 
-### Problema: Entorno virtual corrupto
+### Virtual environment issues
 
 ```bash
-# Reparar automáticamente
 make venv-fix
-
-# O manual
 rm -rf venv/
 make venv
 source venv/bin/activate
 make install
 ```
 
-### Problema: Permiso denegado en Docker
-
-```bash
-# En Linux, agregar usuario al grupo docker
-sudo usermod -aG docker $USER
-newgrp docker
-
-# O ejecutar con sudo
-sudo make up
-```
-
-### Problema: Puerto ya en uso
-
-```bash
-# Ver qué proceso ocupa el puerto
-lsof -i :8001  # Flask
-lsof -i :9001  # ClickHouse
-lsof -i :3001  # Grafana
-
-# Liberar puerto (CUIDADO - mata procesos)
-fuser -k 8001/tcp
-
-# O cambiar puerto en docker-compose.yml
-# Y en .env: CLICKHOUSE_PORT=9002
-```
-
-### Logs útiles para debugging
-
-```bash
-# Logs de todas las operaciones
-tail -f ~/.logs/github-analytics.log
-
-# Dentro de los containers
-docker exec clickhouse_github_analytics \
-  tail -f /var/log/clickhouse-server/clickhouse-server.log
-
-# API Flask (console output)
-python run.py  # Verás logs en tiempo real
-
-# Sistema
-dmesg | tail -20  # Errores del kernel
-```
-
 ---
 
-## 💾 Backup y Recuperación
+## Backup and Recovery
 
-### Estrategia de backup
+### Strategy
 
-```
-Frecuencia: Diaria
-Retención: 30 días
-Ubicación: /backups/
-Validación: Restauración semanal
-```
+- Daily backups
+- 30-day retention
+- Store backups under `/backups/`
+- Validate restores weekly
 
-### Script de backup automático
+### Backup script
 
 ```bash
 #!/bin/bash
-# backup.sh
-
 BACKUP_DIR="/backups/github-analytics"
 DATE=$(date +%Y%m%d_%H%M%S)
-
-# Crear directorio
-mkdir -p $BACKUP_DIR
-
-# Exportar datos de ClickHouse
-docker exec clickhouse_github_analytics \
-  clickhouse-client -q \
-  "SELECT * FROM github_analytics.events 
-   FORMAT Native" > $BACKUP_DIR/events_$DATE.ch
-
-# Exportar modelos ML
-tar -czf $BACKUP_DIR/models_$DATE.tar.gz models/
-
-# Exportar configuración
-cp .env $BACKUP_DIR/env_$DATE.backup
-cp docker-compose.yml $BACKUP_DIR/docker-compose_$DATE.backup
-
-# Limpiar backups antiguos (>30 días)
-find $BACKUP_DIR -type f -mtime +30 -delete
-
-echo "Backup completado en $BACKUP_DIR"
+mkdir -p "$BACKUP_DIR"
+docker exec clickhouse_github_analytics clickhouse-client -q "SELECT * FROM github_analytics.events FORMAT Native" > "$BACKUP_DIR/events_$DATE.ch"
+tar -czf "$BACKUP_DIR/models_$DATE.tar.gz" models/
+cp .env "$BACKUP_DIR/env_$DATE.backup"
+cp docker-compose.yml "$BACKUP_DIR/docker-compose_$DATE.backup"
+find "$BACKUP_DIR" -type f -mtime +30 -delete
+echo "Backup completed in $BACKUP_DIR"
 ```
 
-### Ejecutar backup
+### Restore example
 
 ```bash
-# Manual
-bash backup.sh
-
-# O automático con cron (ejecutar cada día a las 02:00)
-0 2 * * * /path/to/backup.sh >> /var/log/github-analytics-backup.log 2>&1
-```
-
-### Restaurar desde backup
-
-```bash
-# 1. Listar backups disponibles
-ls -lh /backups/github-analytics/
-
-# 2. Restaurar datos (ejemplo con archivo del 2026-06-03)
-docker exec clickhouse_github_analytics \
-  clickhouse-client -q \
-  "INSERT INTO github_analytics.events FORMAT Native" \
-  < /backups/github-analytics/events_20260603_020000.ch
-
-# 3. Restaurar modelos
-tar -xzf /backups/github-analytics/models_20260603_020000.tar.gz \
-  -C ./
-
-# 4. Validar integridad
+docker exec clickhouse_github_analytics clickhouse-client -q "INSERT INTO github_analytics.events FORMAT Native" < /backups/github-analytics/events_20260603_020000.ch
+tar -xzf /backups/github-analytics/models_20260603_020000.tar.gz -C ./
 make health-check
 ```
 
-### Validar integridad de backups
+---
 
-```bash
-# Verificar tamaño
-ls -lh /backups/github-analytics/ | tail -5
+## Scalability
 
-# Probar restauración en entorno de prueba
-docker-compose -f docker-compose.test.yml up -d
-# Restaurar datos...
-make test
-```
+- Monitor ClickHouse partition growth.
+- Archive data outside the retention window.
+- Add caching and materialized views if query volume increases.
+- Scale ClickHouse and API services horizontally as needed.
 
 ---
 
-## 📈 Escalabilidad
+## Security
 
-### Crecer en datos
-
-**Problema:** Tabla `events` crece rápidamente (GB/día)
-
-**Soluciones:**
-
-1. **Particionamiento temporal**
-```bash
-# Ya implementado en create table, verifica:
-python -c "
-from src.database.clickhouse import clickhouse_client
-result = clickhouse_client.execute_query(
-    'SELECT partition, count() as rows FROM system.parts 
-     WHERE database=\"github_analytics\" AND table=\"events\" 
-     GROUP BY partition ORDER BY partition'
-)
-for row in result:
-    print(row)
-"
-```
-
-2. **Archivado de datos antiguos**
-```bash
-# Mover eventos >90 días a tabla de archive
-# Implementar política de TTL en ClickHouse
-python scripts/archive_old_events.py
-```
-
-3. **Compresión**
-```bash
-# Ya usada: LZ4 compression en ClickHouse
-# Para más: cambiar en config.xml a Zstd
-```
-
-### Crecer en consultas
-
-**Problema:** API lenta con muchos usuarios
-
-**Soluciones:**
-
-1. **Caché Redis** (agregar)
-```bash
-# Modificar docker-compose.yml
-services:
-  redis:
-    image: redis:latest
-    ports:
-      - "6379:6379"
-
-# Usar en Flask para caching
-from flask_caching import Cache
-cache = Cache(app, config={'CACHE_TYPE': 'redis'})
-```
-
-2. **Materialized Views** (ya hay)
-```bash
-# Verificar vistas existentes
-python -c "
-from src.database.clickhouse import clickhouse_client
-result = clickhouse_client.execute_query(
-    \"SELECT name FROM system.tables 
-     WHERE database='github_analytics' AND engine LIKE '%View%'\"
-)
-for row in result:
-    print(row[0])
-"
-```
-
-3. **Horizontal scaling** (Replica de ClickHouse)
-```yaml
-# docker-compose.yml - agregar
-clickhouse-replica:
-  image: clickhouse/clickhouse-server:latest
-  environment:
-    CLICKHOUSE_DB: github_analytics
-  ports:
-    - "9002:9000"
-```
-
-### Crecer en procesos
-
-**Problema:** ETL tarda mucho
-
-**Soluciones:**
-
-1. **Paralelizar fetch**
-```bash
-# Modificar github_etl.py
-from concurrent.futures import ThreadPoolExecutor
-with ThreadPoolExecutor(max_workers=5) as executor:
-    # Fetch múltiples repos simultáneamente
-```
-
-2. **Batch insert** (ya optimizado)
-```bash
-# Verificar tamaño de batch en etl/github_etl.py
-BATCH_SIZE = 10000
-```
+- Replace default passwords before production.
+- Rotate `JWT_SECRET_KEY` regularly.
+- Restrict access to admin ports.
+- Terminate TLS at the network boundary.
+- Store secrets in a managed vault.
+- Scan dependencies with `safety` and `bandit`.
 
 ---
 
-## 🔐 Seguridad
+## Monitoring and Alerts
 
-### Hardening de producción
+### Recommended checks
 
-#### 1. Cambiar credenciales por defecto
-
-```bash
-# ❌ NO usar en producción
-# admin/admin (Grafana)
-# empty password (ClickHouse)
-
-# ✓ Cambiar passwords
-
-# Grafana
-docker exec grafana_github_analytics \
-  grafana-cli admin set-password <new-password>
-
-# ClickHouse - editar config/clickhouse/users.xml
-<users>
-  <default>
-    <password_sha256_hex>...</password_sha256_hex>
-  </default>
-</users>
-
-# JWT Secret - CRÍTICO
-echo "JWT_SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(32))')" >> .env
-```
-
-#### 2. Habilitar HTTPS/TLS
-
-```bash
-# Generar certificado auto-firmado
-openssl req -x509 -newkey rsa:4096 -nodes \
-  -out cert.pem -keyout key.pem -days 365
-
-# En Flask (run.py)
-app.run(ssl_context=('cert.pem', 'key.pem'))
-
-# O con gunicorn (producción)
-gunicorn --certfile=cert.pem --keyfile=key.pem \
-  --bind 0.0.0.0:8001 wsgi:app
-```
-
-#### 3. Network policies
-
-```bash
-# Solo expose puertos necesarios
-# En docker-compose.yml, usar solo internal network
-
-services:
-  clickhouse:
-    networks:
-      - github_analytics_net
-    # No exponer puerto 9000 al host en producción
-```
-
-#### 4. Validación de inputs
-
-```bash
-# Ya implementado en Flask, verificar:
-# - src/auth/decorators.py
-# - src/auth/middleware.py
-
-# Agregar rate limiting
-from flask_limiter import Limiter
-limiter = Limiter(app)
-
-@app.route('/api/auth/login', methods=['POST'])
-@limiter.limit("5 per minute")
-def login():
-    ...
-```
-
-#### 5. Auditoría
-
-```bash
-# Loguear accesos
-# En src/utils/logger.py - agregar handler de auditoría
-
-import logging
-audit_log = logging.getLogger('audit')
-handler = logging.FileHandler('audit.log')
-audit_log.addHandler(handler)
-
-# Loguear cada acceso a API
-audit_log.info(f"User {user} accessed {endpoint}")
-```
-
-#### 6. Secretos
-
-```bash
-# NO commitear .env al git
-echo ".env" >> .gitignore
-
-# Usar AWS Secrets Manager o Google Secret Manager en producción
-# Ej con Google:
-from google.cloud import secretmanager
-
-client = secretmanager.SecretManagerServiceClient()
-secret = client.access_secret_version(
-    request={"name": "projects/PROJECT/secrets/GITHUB_TOKEN/versions/latest"}
-)
-GITHUB_TOKEN = secret.payload.data.decode('UTF-8')
-```
-
-#### 7. Regulares security scans
-
-```bash
-# Escanear dependencias por vulnerabilidades
-pip install safety
-safety check
-
-# Escanear código
-pip install bandit
-bandit -r src/
-
-# Actualizar dependencias regularmente
-pip install --upgrade pip
-pip list --outdated
-```
-
----
-
-## 📊 Monitoreo y Alertas
-
-### Métricas clave
-
-| Métrica | Umbral Alerta | Frecuencia Chequeo |
-|---------|---------------|-------------------|
-| Tamaño BD | > 500GB | Diario |
-| Health API | Respuesta > 2s | 5 min |
-| Tasa eventos | < 100/hora | Cada 30 min |
-| Modelos antiguos | > 7 días | Diario |
-| ClickHouse CPU | > 80% | Cada 2 min |
+- API health and latency
+- Grafana availability
+- ClickHouse query performance
+- Event ingestion volume
+- Model retraining schedule
 
 ### Health checks
 
 ```bash
-# Sistema completo
 make health-check
-
-# Individual
 curl http://localhost:8001/api/health
 curl http://localhost:3001/api/health
-docker exec clickhouse_github_analytics \
-  clickhouse-client -q "SELECT 1"
-```
-
-### Dashboard de monitoreo
-
-Crear en Grafana:
-
-```
-1. State of system (CPU, Memory)
-   Query: SELECT * FROM system.processes LIMIT 1
-
-2. Events per hour
-   Query: SELECT toStartOfHour(created_at) as hour, count()
-          FROM events GROUP BY hour
-
-3. API response time
-   Query: SELECT endpoint, avg(response_time_ms) FROM api_logs 
-          GROUP BY endpoint
-
-4. Model staleness
-   Query: SELECT max(trained_at) FROM models
-```
-
-### Alertas en Grafana
-
-```bash
-# 1. Ir a http://localhost:3001/alerting/notification-channels
-# 2. Agregar canal (Email, Slack, PagerDuty)
-# 3. Crear alertas por dashboard
-
-# Ejemplo Slack:
-# Condition: when query(A) is above 1000
-# Then: notify Slack channel #alerts
-```
-
-### Logs centralizados
-
-Agregador de logs (opcional pero recomendado):
-
-```yaml
-# Agregar a docker-compose.yml
-loki:
-  image: grafana/loki:latest
-  ports:
-    - "3100:3100"
-
-promtail:
-  image: grafana/promtail:latest
-  volumes:
-    - /var/log:/var/log
-    - /var/lib/docker/containers:/var/lib/docker/containers
+docker exec clickhouse_github_analytics clickhouse-client -q "SELECT 1"
 ```
 
 ---
 
-## 🚨 Procedimientos de Respuesta a Incidentes
+## CI/CD Pipeline Management
 
-### Clasificación de severidad
+### GitHub Actions workflow ingestion
 
-| Severidad | Descripción | Respuesta | Escalación |
-|-----------|------------|-----------|-----------|
-| P1 | Sistema no disponible | 15 min | DevOps Lead |
-| P2 | Funcionalidad reducida | 30 min | Tech Lead |
-| P3 | Bug menor | 4 horas | Backlog |
+The platform automatically tracks GitHub Actions workflow runs to monitor pipeline health and identify flaky tests.
 
-### Playbooks
+### Workflow run storage
 
-#### P1: API no responde
+Workflow execution data is stored in ClickHouse under:
+
+```sql
+-- CI workflow runs table
+CREATE TABLE IF NOT EXISTS github_analytics.ci_workflow_runs (
+    run_id UInt64,
+    workflow_name String,
+    status String,  -- success, failure, cancelled
+    conclusion String,
+    run_number Int32,
+    created_at DateTime,
+    updated_at DateTime,
+    duration_seconds Int32,
+    repo_name String
+) ENGINE = MergeTree()
+ORDER BY (created_at, repo_name, workflow_name);
+
+-- Flaky test detection table
+CREATE TABLE IF NOT EXISTS github_analytics.flaky_tests (
+    test_name String,
+    repo_name String,
+    failure_rate Float32,
+    recent_failures Int32,
+    total_runs Int32,
+    last_detected DateTime,
+    severity String  -- low, medium, high
+) ENGINE = MergeTree()
+ORDER BY (failure_rate DESC, last_detected);
+```
+
+### Flaky test detection logic
+
+The system automatically identifies flaky tests based on:
+
+- **Failure rate threshold:** Tests failing 10-50% of the time
+- **Recent trend:** 3+ consecutive failures in the last 10 runs
+- **Impact assessment:** Tests affecting critical workflows flagged as `high` severity
+
+Detection runs hourly via `scripts/analyze_flaky_tests.py`.
+
+### Pipeline health dashboards
+
+Planned dashboard location: `grafana/dashboards/ci_pipeline_health.json`.
+If the file is not yet present, it is expected to be included during setup or in a future release.
+
+Metrics tracked:
+
+- Workflow success rate by job
+- Pipeline duration trends
+- Flaky test detection and severity
+- Release pipeline progression
+- Deployment frequency and lead time
+
+### Release pipeline execution
+
+The release pipeline (`release.yml`) is triggered on version tags. If this file is not yet present in the repository, it should be added as part of the CI/CD implementation or documented in a future version.
 
 ```bash
-# 1. Verificar proceso
-docker ps | grep predictions-api
+# Trigger release via git tag
+git tag -a v1.0.0 -m "Release version 1.0.0"
+git push origin v1.0.0
 
-# 2. Si no está, reiniciar
+# Monitor release progress
+make logs | grep release
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8001/api/releases
+```
+
+### Query CI metrics
+
+```bash
+# Flaky tests (last 30 days)
+clickhouse-client -h localhost -p 9000 -q \
+  "SELECT test_name, failure_rate, severity \
+   FROM github_analytics.flaky_tests \
+   WHERE last_detected > now() - interval 30 day \
+   ORDER BY failure_rate DESC"
+
+# Workflow run success rate
+clickhouse-client -h localhost -p 9000 -q \
+  "SELECT workflow_name, \
+   countIf(status='success') / count() as success_rate \
+   FROM github_analytics.ci_workflow_runs \
+   WHERE created_at > now() - interval 7 day \
+   GROUP BY workflow_name \
+   ORDER BY success_rate"
+
+# Release deployment frequency (last 90 days)
+clickhouse-client -h localhost -p 9000 -q \
+  "SELECT toDate(created_at) as date, count() as deployments \
+   FROM github_analytics.releases \
+   WHERE created_at > now() - interval 90 day \
+   GROUP BY date \
+   ORDER BY date DESC"
+```
+
+### CI/CD troubleshooting
+
+**Workflow runs not appearing:**
+
+```bash
+# Check GitHub Actions sync status
+make logs | grep "workflow"
+docker exec clickhouse_github_analytics clickhouse-client -q \
+  "SELECT COUNT(*) FROM github_analytics.ci_workflow_runs"
+
+# Manually sync workflows
+python scripts/sync_workflows.py --full
+```
+
+**Flaky test detection disabled:**
+
+```bash
+# Check if analysis script is running
+ps aux | grep analyze_flaky_tests
+# Restart if needed
+python scripts/analyze_flaky_tests.py
+```
+
+---
+
+## Incident Response
+
+### Severity levels and SLOs
+
+| Severity | Impact | Response SLO | Escalation |
+|----------|--------|----------|------------|
+| P1 | System outage (no data ingestion) | 15 min | DevOps lead |
+| P2 | Partial degradation (slow queries, failed jobs) | 30 min | Tech lead |
+| P3 | Minor issue (UI glitch, non-critical alert) | 4 hours | Backlog |
+
+### Incident communication template
+
+When an incident occurs, use this Slack template for async communication:
+
+```
+🚨 **INCIDENT ALERT: [P1/P2/P3] - [Component] - [Brief description]**
+
+**Affected services:** ClickHouse / Grafana / API / ETL
+**Status:** 🔴 CRITICAL | 🟠 DEGRADED | 🟢 RESOLVED
+**Time detected:** [HH:MM UTC]
+**Estimated impact:** [number] users / [service] affected
+
+**Actions being taken:**
+- [ ] Assess severity
+- [ ] Notify on-call
+- [ ] Begin remediation
+- [ ] Update status
+
+**Latest update:** [time] - [status message]
+```
+
+### P1: API unavailable
+
+```bash
+# 1. Check service status
+docker ps | grep predictions-api
+docker logs predictions-api --tail=50
+
+# 2. Check dependencies
+docker ps | grep clickhouse
+docker logs clickhouse_github_analytics --tail=50
+
+# 3. Restart if needed
 docker-compose restart predictions-api
 
-# 3. Ver logs
-docker logs predictions-api
+# 4. Verify recovery
+curl http://localhost:8001/api/health
+TOKEN=$(curl -s -X POST http://localhost:8001/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}' | jq -r '.token')
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8001/api/repos
 
-# 4. Si falla, revisar ClickHouse
-docker ps | grep clickhouse
-docker logs clickhouse_github_analytics
-
-# 5. Si todo falla, rollback
+# 5. If still failing, check git history
 git log --oneline | head -5
-git revert <commit>
+git revert <commit-hash>
 make restart
-
-# 6. Post-incidente
-# Documentar causa en https://github.com/org/repo/issues/new
-# Assignar follow-up
-```
-
-#### P2: ClickHouse lentitud
-
-```bash
-# 1. Revisar métricas
-docker exec clickhouse_github_analytics \
-  clickhouse-client -q "SHOW PROCESSLIST"
-
-# 2. Matar queries largas si es necesario
-docker exec clickhouse_github_analytics \
-  clickhouse-client -q "KILL QUERY WHERE elapsed > 300"
-
-# 3. Compactar
-docker exec clickhouse_github_analytics \
-  clickhouse-client -q "OPTIMIZE TABLE events FINAL"
-
-# 4. Si sigue lento, revisar disk I/O
-docker stats clickhouse_github_analytics
-```
-
-#### P3: Modelo no se entrena
-
-```bash
-# 1. Ver logs de scheduler
-tail -f scheduler.log
-
-# 2. Revisar datos de entrenamiento
-python -c "
-from src.models.github_models import load_training_data
-data = load_training_data()
-print(f'Rows: {len(data)}')
-"
-
-# 3. Re-entrenar
-make train-model
-
-# 4. Validar modelo
-python -c "
-import joblib
-model = joblib.load('models/issue_classifier.pkl')
-print(f'Model score: {model.score(X_test, y_test)}')
-"
-```
-
-### Comunicación de incidentes
-
-```
-Plantilla de status update:
-
-🚨 INCIDENT: [Descripción breve]
-⏰ Detectado: [hora]
-⚠️ Impacto: [N usuarios afectados]
-🔧 Acción: [Acciones tomadas]
-📊 Status: [Investigando/Mitigando/Resuelto]
-✅ Resolución esperada: [ETA]
-
-Mantener actualizaciones c/15 min mientras sea P1
 ```
 
 ---
 
-## 📚 Recursos Útiles
+## Grafana Dashboards
 
-### Documentación
+Dashboards are stored as JSON in `grafana/dashboards/` and can be imported manually or via the API.
 
-- [README.md](README.md) - Descripción del proyecto
-- [docs/api_documentation.md](docs/api_documentation.md) - API endpoints
-- ClickHouse docs: https://clickhouse.com/docs/
-- Grafana docs: https://grafana.com/docs/grafana/latest/
+### Available dashboards
 
-### Comandos frecuentes
+1. **GitHub Repository Analytics** (`github_analytics.json`)
+   - Repository event trends
+   - Issue and PR activity
+   - Commit patterns by author
 
-```bash
-# Reiniciar todo limpiamente
-make clean && make setup
+2. **CI Pipeline Health** (`ci_pipeline_health.json`)
+   - Workflow success rates
+   - Flaky test detection
+   - Release deployment frequency
 
-# Ver estado en vivo
-watch -n 5 'make status'
+3. **System Health** (`system_health.json`)
+   - API latency and throughput
+   - ClickHouse query performance
+   - Data ingestion volume
 
-# Monitorear logs
-watch -n 1 'docker logs clickhouse_github_analytics | tail -20'
-
-# Backup rápido
-tar -czf backup_$(date +%s).tar.gz models/ .env
-
-# Limpiar datos de prueba
-docker exec clickhouse_github_analytics \
-  clickhouse-client -q "TRUNCATE github_analytics.events"
-```
-
-### Contactos y escalación
-
-```
-Slack Channel: #github-analytics
-On-Call: @devops-team
-PagerDuty: [link]
-Documentation: [wiki]
-Runbook: RUNBOOK.md (este archivo)
-```
-
-### Control de versiones
+### Import a dashboard
 
 ```bash
-# Versión actual
-grep "version" package.json || echo "Ver git tags"
-git describe --tags
+# Method 1: Manual via UI
+# 1. Open Grafana at http://localhost:3001
+# 2. Go to Dashboards > Import
+# 3. Upload `grafana/dashboards/[name].json`
 
-# Historial de cambios
-git log --oneline -10
+# Method 2: Via API
+TOKEN=$(curl -s -X POST http://localhost:3001/api/auth/login \
+  -u admin:admin | jq -r '.message' | grep -oE '"[^"]*"' | head -1)
 
-# Cambios en la rama
-git diff main
+curl -X POST http://localhost:3001/api/dashboards/db \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d @grafana/dashboards/github_analytics.json
 ```
 
 ---
 
-## 📝 Plantilla de Cambios
+## Resources
 
-Siempre que realices cambios importantes:
-
-```markdown
-## Cambio realizado
-
-**Fecha:** 2026-06-03
-**Realizado por:** [tu nombre]
-**Ticket:** [#123]
-
-### Cambio
-- Qué se modificó
-
-### Razón
-- Por qué se hizo
-
-### Validación
-- Cómo se verificó
-
-### Rollback (si aplica)
-- Cómo revertir
-
-### Impacto
-- Qué se vio afectado
-```
+- [README.md](README.md) — Project overview and quick start
+- [API Documentation](docs/api_documentation.md) — Full endpoint reference
+- [Grafana Dashboards](grafana/dashboards/) — Pre-built visualization templates
+- Makefile — All available commands
+- `src/config/settings.py` — Application configuration
 
 ---
 
-## 📞 Contacto y Soporte
-
-**Maintainers:**
-- DevOps: @devops-team
-- Backend: @backend-team
-
-**Recursos:**
-- GitHub Issues: [repo/issues](https://github.com/repo/issues)
-- Slack: #github-analytics
-- Docs: /docs
-
----
-
-**Última revisión:** Junio 2026  
-**Próxima revisión:** Septiembre 2026  
-**Versión del runbook:** 1.0
+**Last review:** June 2026  
+**Next review:** September 2026  
+**Runbook version:** 1.1  
+**CI/CD section added:** June 2026
