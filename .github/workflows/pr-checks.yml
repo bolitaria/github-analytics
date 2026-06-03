@@ -119,7 +119,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install Safety
         run: pip install safety
-      - name: Check dependencies
+      - name: Check dependencies for vulnerabilities
         run: safety check --full-report
       - name: Install Bandit
         run: pip install bandit

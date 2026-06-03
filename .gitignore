@@ -145,4 +145,4 @@ grafana/provisioning/datasources/*.yaml   # si quieres evitar subir credenciales
 # =======================
 # 13. Logs de GitHub Actions (locales)
 # =======================
-.github/workflows/logs/
+.github/workflows/logs/venv/
