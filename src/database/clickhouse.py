@@ -3,6 +3,7 @@ import pandas as pd
 from src.config.settings import settings
 from src.utils.logger import logger
 
+
 class ClickHouseClient:
     def __init__(self):
         self.client = Client(
@@ -10,7 +11,7 @@ class ClickHouseClient:
             port=9001,  # Puerto nativo mapeado
             user=settings.CLICKHOUSE_USER,
             password=settings.CLICKHOUSE_PASSWORD,
-            database=settings.CLICKHOUSE_DATABASE
+            database=settings.CLICKHOUSE_DATABASE,
         )
         logger.info("ClickHouse client initialized with native protocol")
 
@@ -24,12 +25,12 @@ class ClickHouseClient:
     def insert_batch(self, table: str, data: list):
         if not data:
             return
-        
+
         columns = list(data[0].keys())
         query = f"INSERT INTO {table} ({', '.join(columns)}) VALUES"
-        
+
         values = [tuple(item[col] for col in columns) for item in data]
-        
+
         try:
             self.client.execute(query, values)
         except Exception as e:
@@ -49,5 +50,6 @@ class ClickHouseClient:
         except Exception as e:
             logger.error(f"Error in query_dataframe: {e}")
             return pd.DataFrame()
+
 
 clickhouse_client = ClickHouseClient()
