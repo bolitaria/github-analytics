@@ -5,6 +5,12 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# Permisos mínimos: solo lectura por defecto, escritura solo para comentar en PR y subir seguridad
+permissions:
+  contents: read
+  pull-requests: write   # para comentar flaky tests
+  security-events: write # para subir resultados de Trivy
+
 env:
   PYTHON_VERSION: '3.12'
   SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -173,7 +179,7 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '⚠️ **Potential flaky tests detected**\n\nUnit tests failed in ${{ steps.analyze.outputs.failures }} out of 5 runs. Please review the test suite for nondeterministic behaviour.'
+              body: '**Potential flaky tests detected**\n\nUnit tests failed in ${{ steps.analyze.outputs.failures }} out of 5 runs. Please review the test suite for nondeterministic behaviour.'
             })
 
   notify:
