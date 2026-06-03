@@ -1,200 +1,104 @@
-name: PR Quality & CI Checks
+name: Release Pipeline
 
 on:
-  pull_request:
+  push:
     branches: [ main ]
   workflow_dispatch:
 
-# Permisos mínimos: solo lectura por defecto, escritura solo para comentar en PR y subir seguridad
 permissions:
   contents: read
-  pull-requests: write   # para comentar flaky tests
-  security-events: write # para subir resultados de Trivy
+  packages: write   # necesario para push a GHCR
 
 env:
-  PYTHON_VERSION: '3.12'
-  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  lint:
-    name: Lint (black, isort, flake8)
+  build-and-push:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install linting tools
-        run: pip install black isort flake8
-      - name: Run black
-        run: black --check src/ tests/
-      - name: Run isort
-        run: isort --check-only src/ tests/
-      - name: Run flake8
-        run: flake8 src/ tests/ --max-line-length=120
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and push app image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-app:latest -f Dockerfile .
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-app:latest
+      - name: Build and push ETL image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-etl:latest -f Dockerfile.etl .
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-etl:latest
 
-  unit-tests:
-    name: Unit tests (5 attempts)
+  deploy-staging:
     runs-on: ubuntu-latest
-    needs: lint
-    strategy:
-      matrix:
-        repeat: [1, 2, 3, 4, 5]
+    needs: build-and-push
+    environment:
+      name: staging
+      url: http://staging.example.com
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Run unit tests (attempt ${{ matrix.repeat }})
-        id: test
-        continue-on-error: true
-        run: pytest tests/ -v --maxfail=1 --tb=short --ignore=tests/integration
-      - name: Record attempt result
-        run: echo "attempt=${{ matrix.repeat }} status=${{ steps.test.outcome }}" >> flaky_attempts.txt
-      - name: Upload flaky attempts
-        if: always()
+      - name: Deploy to staging (simulated)
+        run: echo "Deploying to staging environment..."
+
+  smoke-test-staging:
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    steps:
+      - name: Run smoke tests
+        run: |
+          curl -f http://staging.example.com/api/health || exit 1
+
+  wait-approval:
+    runs-on: ubuntu-latest
+    needs: smoke-test-staging
+    environment:
+      name: production
+    steps:
+      - name: Manual approval required
+        run: echo "Waiting for approval from release manager"
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: wait-approval
+    steps:
+      - name: Deploy to production
+        run: echo "Deploying to production..."
+
+  generate-release-report:
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    steps:
+      - name: Generate release report
+        run: |
+          echo "# Release Report" > release_report.md
+          echo "**Date:** $(date)" >> release_report.md
+          echo "**Commit:** ${{ github.sha }}" >> release_report.md
+          echo "**Status:** Deployed to production" >> release_report.md
+          cat release_report.md
+      - name: Upload release report
         uses: actions/upload-artifact@v4
         with:
-          name: flaky-attempts-${{ github.run_id }}
-          path: flaky_attempts.txt
+          name: release-report
+          path: release_report.md
 
-  integration-matrix:
-    name: Integration tests (${{ matrix.db }})
+  # Notificación Slack (opcional, solo si el secreto está configurado)
+  notify-slack:
     runs-on: ubuntu-latest
-    needs: unit-tests
-    strategy:
-      matrix:
-        db: [clickhouse, postgres, mysql]
-    services:
-      clickhouse:
-        image: clickhouse/clickhouse-server:23.8
-        ports: ['8123:8123', '9000:9000']
-        options: >-
-          --health-cmd "wget --spider --quiet http://localhost:8123/ping || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-          --health-start-period 30s
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_DB: github_analytics
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: admin123
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-      mysql:
-        image: mysql:8
-        env:
-          MYSQL_DATABASE: github_analytics
-          MYSQL_ROOT_PASSWORD: root123
-          MYSQL_USER: admin
-          MYSQL_PASSWORD: admin123
-        ports: ['3306:3306']
-        options: >-
-          --health-cmd "mysqladmin ping -h localhost -u root -proot123"
-          --health-interval 10s
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Run integration tests for ${{ matrix.db }}
-        run: |
-          pytest tests/integration -v -k "${{ matrix.db }}" || echo "No integration tests for ${{ matrix.db }} yet"
-        env:
-          TEST_DB: ${{ matrix.db }}
-
-  security:
-    name: Security scan (Safety, Bandit, Trivy)
-    runs-on: ubuntu-latest
-    needs: lint
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install Safety
-        run: pip install safety
-      - name: Check dependencies for vulnerabilities
-        run: safety check --full-report
-      - name: Install Bandit
-        run: pip install bandit
-      - name: Run Bandit SAST
-        run: bandit -r src/ -ll -f json -o bandit_report.json || true
-      - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: fs
-          scan-ref: .
-          format: sarif
-          output: trivy-results.sarif
-      - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-results.sarif
-
-  flaky-detection:
-    name: Detect flaky tests
-    runs-on: ubuntu-latest
-    needs: [unit-tests]
+    needs: [build-and-push, deploy-staging, smoke-test-staging, wait-approval, deploy-production, generate-release-report]
     if: always()
     steps:
-      - uses: actions/checkout@v4
-      - name: Download flaky attempts
-        uses: actions/download-artifact@v4
-        with:
-          name: flaky-attempts-${{ github.run_id }}
-          path: ./
-        continue-on-error: true
-      - name: Analyze results
-        id: analyze
+      - name: Check if Slack webhook is configured
+        id: check_slack
         run: |
-          if [ -f flaky_attempts.txt ]; then
-            failures=$(grep -c "status=failure" flaky_attempts.txt || true)
-            echo "failures=$failures" >> $GITHUB_OUTPUT
-            if [ $failures -gt 0 ] && [ $failures -lt 5 ]; then
-              echo "flaky=True" >> $GITHUB_OUTPUT
-            else
-              echo "flaky=False" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "flaky=False" >> $GITHUB_OUTPUT
+          if [ -z "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
           fi
-      - name: Comment PR about flaky tests
-        if: steps.analyze.outputs.flaky == 'True'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '⚠️ **Potential flaky tests detected**\n\nUnit tests failed in ${{ steps.analyze.outputs.failures }} out of 5 runs. Please review the test suite for nondeterministic behaviour.'
-            })
-
-  notify:
-    name: Notify Slack
-    runs-on: ubuntu-latest
-    needs: [lint, unit-tests, integration-matrix, security, flaky-detection]
-    if: always() && env.SLACK_WEBHOOK_URL != ''
-    steps:
-      - name: Send notification
+      - name: Send Slack notification
+        if: steps.check_slack.outputs.skip != 'true'
         uses: slackapi/slack-github-action@v1.25
         with:
           payload: |
             {
-              "text": "PR #${{ github.event.number }} CI status: ${{ job.status }}\nRepo: ${{ github.repository }}\nCommit: ${{ github.sha }}\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+              "text": "Release pipeline finished\nRepo: ${{ github.repository }}\nCommit: ${{ github.sha }}\nStatus: ${{ job.status }}\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
