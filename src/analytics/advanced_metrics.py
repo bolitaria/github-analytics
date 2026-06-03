@@ -1,6 +1,7 @@
 """
 Módulo para métricas avanzadas y KPIs de GitHub
 """
+
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 import logging
@@ -8,11 +9,14 @@ from src.database.clickhouse_client import ClickHouseClient
 
 logger = logging.getLogger(__name__)
 
+
 class AdvancedGitHubMetrics:
     def __init__(self, clickhouse_client: ClickHouseClient):
         self.client = clickhouse_client
-    
-    def get_developer_velocity_metrics(self, repo_name: str, days: int = 30) -> Dict[str, Any]:
+
+    def get_developer_velocity_metrics(
+        self, repo_name: str, days: int = 30
+    ) -> Dict[str, Any]:
         """Calcular métricas de velocidad de desarrollo"""
         query = """
         SELECT
@@ -27,46 +31,49 @@ class AdvancedGitHubMetrics:
         WHERE repo_name = %(repo_name)s 
           AND created_at >= now() - INTERVAL %(days)s DAY
         """
-        
-        result = self.client.execute_query(query, {
-            'repo_name': repo_name,
-            'days': days
-        })
-        
+
+        result = self.client.execute_query(
+            query, {"repo_name": repo_name, "days": days}
+        )
+
         if result:
             return {
-                'push_events': result[0][0],
-                'pr_events': result[0][1],
-                'issue_events': result[0][2],
-                'watch_events': result[0][3],
-                'active_developers': result[0][4],
-                'active_days': result[0][5],
-                'events_per_day': result[0][6],
-                'velocity_score': self._calculate_velocity_score(result[0])
+                "push_events": result[0][0],
+                "pr_events": result[0][1],
+                "issue_events": result[0][2],
+                "watch_events": result[0][3],
+                "active_developers": result[0][4],
+                "active_days": result[0][5],
+                "events_per_day": result[0][6],
+                "velocity_score": self._calculate_velocity_score(result[0]),
             }
         return {}
-    
+
     def _calculate_velocity_score(self, metrics_data) -> float:
         """Calcular score de velocidad basado en múltiples métricas"""
         push_weight = 0.3
         pr_weight = 0.4
         developer_weight = 0.2
         activity_weight = 0.1
-        
+
         push_score = min(metrics_data[0] / 100, 1.0)  # Normalizar a max 100 pushes
-        pr_score = min(metrics_data[1] / 50, 1.0)     # Normalizar a max 50 PRs
-        developer_score = min(metrics_data[4] / 10, 1.0)  # Normalizar a max 10 developers
-        activity_score = min(metrics_data[6] / 20, 1.0)   # Normalizar a max 20 eventos/día
-        
+        pr_score = min(metrics_data[1] / 50, 1.0)  # Normalizar a max 50 PRs
+        developer_score = min(
+            metrics_data[4] / 10, 1.0
+        )  # Normalizar a max 10 developers
+        activity_score = min(
+            metrics_data[6] / 20, 1.0
+        )  # Normalizar a max 20 eventos/día
+
         total_score = (
-            push_score * push_weight +
-            pr_score * pr_weight +
-            developer_score * developer_weight +
-            activity_score * activity_weight
+            push_score * push_weight
+            + pr_score * pr_weight
+            + developer_score * developer_weight
+            + activity_score * activity_weight
         )
-        
+
         return round(total_score * 100, 2)  # Convertir a porcentaje
-    
+
     def get_community_health_metrics(self, repo_name: str) -> Dict[str, Any]:
         """Calcular métricas de salud de la comunidad"""
         query = """
@@ -100,38 +107,44 @@ class AdvancedGitHubMetrics:
             round(rc.recent_contributors * 100.0 / rs.total_contributors, 2) as contributor_retention_rate
         FROM repo_stats rs, recent_contributors rc
         """
-        
-        result = self.client.execute_query(query, {'repo_name': repo_name})
-        
+
+        result = self.client.execute_query(query, {"repo_name": repo_name})
+
         if result:
             return {
-                'total_events': result[0][0],
-                'total_contributors': result[0][1],
-                'recent_contributors': result[0][2],
-                'stars': result[0][3],
-                'forks': result[0][4],
-                'total_issues': result[0][5],
-                'total_prs': result[0][6],
-                'first_event_date': result[0][7].strftime('%Y-%m-%d') if result[0][7] else None,
-                'contributor_retention_rate': result[0][8],
-                'health_score': self._calculate_health_score(result[0])
+                "total_events": result[0][0],
+                "total_contributors": result[0][1],
+                "recent_contributors": result[0][2],
+                "stars": result[0][3],
+                "forks": result[0][4],
+                "total_issues": result[0][5],
+                "total_prs": result[0][6],
+                "first_event_date": (
+                    result[0][7].strftime("%Y-%m-%d") if result[0][7] else None
+                ),
+                "contributor_retention_rate": result[0][8],
+                "health_score": self._calculate_health_score(result[0]),
             }
         return {}
-    
+
     def _calculate_health_score(self, metrics_data) -> float:
         """Calcular score de salud de la comunidad"""
         contributor_score = min(metrics_data[1] / 50, 1.0)  # Max 50 contributors
-        retention_score = min(metrics_data[8] / 100, 1.0)   # Retention rate
-        activity_score = min(metrics_data[0] / 1000, 1.0)   # Max 1000 eventos
-        engagement_score = min((metrics_data[3] + metrics_data[4]) / 100, 1.0)  # Stars + forks
-        
+        retention_score = min(metrics_data[8] / 100, 1.0)  # Retention rate
+        activity_score = min(metrics_data[0] / 1000, 1.0)  # Max 1000 eventos
+        engagement_score = min(
+            (metrics_data[3] + metrics_data[4]) / 100, 1.0
+        )  # Stars + forks
+
         weights = [0.3, 0.3, 0.2, 0.2]  # Pesos para cada métrica
         scores = [contributor_score, retention_score, activity_score, engagement_score]
-        
+
         total_score = sum(score * weight for score, weight in zip(scores, weights))
         return round(total_score * 100, 2)
-    
-    def get_trending_repositories(self, days: int = 7, limit: int = 10) -> List[Dict[str, Any]]:
+
+    def get_trending_repositories(
+        self, days: int = 7, limit: int = 10
+    ) -> List[Dict[str, Any]]:
         """Obtener repositorios trending"""
         query = """
         SELECT
@@ -148,27 +161,26 @@ class AdvancedGitHubMetrics:
         ORDER BY trend_score DESC
         LIMIT %(limit)s
         """
-        
-        results = self.client.execute_query(query, {
-            'days': days,
-            'limit': limit
-        })
-        
+
+        results = self.client.execute_query(query, {"days": days, "limit": limit})
+
         trending_repos = []
         for row in results:
-            trending_repos.append({
-                'repository': row[0],
-                'event_count': row[1],
-                'contributor_count': row[2],
-                'new_stars': row[3],
-                'new_forks': row[4],
-                'daily_avg_events': row[5],
-                'trend_score': row[6],
-                'trend_level': self._get_trend_level(row[6])
-            })
-        
+            trending_repos.append(
+                {
+                    "repository": row[0],
+                    "event_count": row[1],
+                    "contributor_count": row[2],
+                    "new_stars": row[3],
+                    "new_forks": row[4],
+                    "daily_avg_events": row[5],
+                    "trend_score": row[6],
+                    "trend_level": self._get_trend_level(row[6]),
+                }
+            )
+
         return trending_repos
-    
+
     def _get_trend_level(self, trend_score: float) -> str:
         """Determinar nivel de trending basado en el score"""
         if trend_score >= 20:
