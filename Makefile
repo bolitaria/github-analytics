@@ -1,4 +1,4 @@
-.PHONY: help install venv init up down clean test run-etl demo logs setup quick-start generate-sample-data check-env venv-check venv-fix restart status activate info health-check logs-clickhouse logs-grafana init-users export-bigquery run-scheduler setup-grafana test-integration deploy-gcp train-model update-thresholds generate-dashboard deploy-dashboard enterprise-deploy
+.PHONY: help install venv init up down clean test run-etl demo logs setup quick-start generate-sample-data check-env venv-check venv-fix restart status activate info health-check logs-clickhouse logs-grafana init-users export-bigquery run-scheduler setup-grafana test-integration deploy-gcp train-model update-thresholds generate-dashboard deploy-dashboard enterprise-deploy lint pre-push
 
 # Colors for better output
 GREEN := $(shell tput -Txterm setaf 2)
@@ -44,6 +44,8 @@ help:
 	@echo "$(BLUE)🧪 TESTING & DEVELOPMENT:$(RESET)"
 	@echo "  $(YELLOW)test$(RESET)            - Run unit tests"
 	@echo "  $(YELLOW)test-integration$(RESET)- Run integration tests"
+	@echo "  $(YELLOW)lint$(RESET)            - Run linters (black, isort, flake8)"
+	@echo "  $(YELLOW)pre-push$(RESET)        - Run all checks before push (lint + test + test-integration)"
 	@echo "  $(YELLOW)status$(RESET)          - Check system status"
 	@echo "  $(YELLOW)health-check$(RESET)    - Check service health"
 	@echo "  $(YELLOW)activate$(RESET)        - Show command to activate venv"
@@ -131,10 +133,12 @@ install: check-env venv-check
 			echo "$(YELLOW)Using venv/bin/python$(RESET)"; \
 			./venv/bin/python -m pip install --upgrade pip || (echo "$(RED)❌ Error upgrading pip$(RESET)" && exit 1); \
 			./venv/bin/python -m pip install -r requirements.txt || (echo "$(RED)❌ Error installing dependencies$(RESET)" && exit 1); \
+			./venv/bin/python -m pip install black isort flake8 || (echo "$(RED)❌ Error installing linting tools$(RESET)" && exit 1); \
 		else \
 			echo "$(YELLOW)Using venv/bin/python3$(RESET)"; \
 			./venv/bin/python3 -m pip install --upgrade pip || (echo "$(RED)❌ Error upgrading pip$(RESET)" && exit 1); \
 			./venv/bin/python3 -m pip install -r requirements.txt || (echo "$(RED)❌ Error installing dependencies$(RESET)" && exit 1); \
+			./venv/bin/python3 -m pip install black isort flake8 || (echo "$(RED)❌ Error installing linting tools$(RESET)" && exit 1); \
 		fi \
 	else \
 		echo "$(RED)❌ Cannot find Python in virtual environment$(RESET)"; \
@@ -144,9 +148,11 @@ install: check-env venv-check
 		if [ -f "venv/bin/python" ]; then \
 			./venv/bin/python -m pip install --upgrade pip; \
 			./venv/bin/python -m pip install -r requirements.txt; \
+			./venv/bin/python -m pip install black isort flake8; \
 		else \
 			./venv/bin/python3 -m pip install --upgrade pip; \
 			./venv/bin/python3 -m pip install -r requirements.txt; \
+			./venv/bin/python3 -m pip install black isort flake8; \
 		fi \
 	fi
 	@echo "$(GREEN)✅ Dependencies installed successfully$(RESET)"
@@ -173,7 +179,7 @@ restart: down up
 
 init: up
 	@echo "$(GREEN)Initializing ClickHouse...$(RESET)"
-	@sleep 15  # Give ClickHouse time to start
+	@sleep 15
 	@if [ -f "venv/bin/python" ]; then \
 		PYTHONPATH=$(PWD) ./venv/bin/python scripts/init_clickhouse.py; \
 	elif [ -f "venv/bin/python3" ]; then \
@@ -211,11 +217,38 @@ demo: generate-sample-data run-etl
 test:
 	@echo "$(GREEN)Running tests...$(RESET)"
 	@if [ -f "venv/bin/python" ]; then \
-		./venv/bin/python -m pytest tests/ -v; \
+		./venv/bin/python -m pytest tests/ -v --ignore=tests/integration; \
 	else \
-		./venv/bin/python3 -m pytest tests/ -v; \
+		./venv/bin/python3 -m pytest tests/ -v --ignore=tests/integration; \
 	fi
 	@echo "$(GREEN)✅ Tests completed$(RESET)"
+
+test-integration:
+	@echo "$(GREEN)Running integration tests...$(RESET)"
+	@if [ -f "venv/bin/python" ]; then \
+		./venv/bin/python -m pytest tests/test_integration.py -v; \
+	else \
+		./venv/bin/python3 -m pytest tests/test_integration.py -v; \
+	fi
+
+lint:
+	@echo "$(GREEN)Running linters...$(RESET)"
+	@# Ensure linting tools are installed
+	@if [ -f "venv/bin/python" ]; then \
+		./venv/bin/python -m pip install black isort flake8 --quiet; \
+		./venv/bin/python -m black --check src/ tests/ || (echo "$(RED)❌ Black formatting check failed$(RESET)" && exit 1); \
+		./venv/bin/python -m isort --check-only src/ tests/ || (echo "$(RED)❌ Isort check failed$(RESET)" && exit 1); \
+		./venv/bin/python -m flake8 src/ tests/ --max-line-length=120 || (echo "$(RED)❌ Flake8 check failed$(RESET)" && exit 1); \
+	else \
+		./venv/bin/python3 -m pip install black isort flake8 --quiet; \
+		./venv/bin/python3 -m black --check src/ tests/ || (echo "$(RED)❌ Black formatting check failed$(RESET)" && exit 1); \
+		./venv/bin/python3 -m isort --check-only src/ tests/ || (echo "$(RED)❌ Isort check failed$(RESET)" && exit 1); \
+		./venv/bin/python3 -m flake8 src/ tests/ --max-line-length=120 || (echo "$(RED)❌ Flake8 check failed$(RESET)" && exit 1); \
+	fi
+	@echo "$(GREEN)✅ Linting passed$(RESET)"
+
+pre-push: lint test test-integration
+	@echo "$(GREEN)✅ All pre-push checks passed! You can now push safely.$(RESET)"
 
 logs:
 	@echo "$(GREEN)Showing logs...$(RESET)"
@@ -310,14 +343,6 @@ setup-grafana:
 		./venv/bin/python scripts/setup_grafana.py; \
 	else \
 		./venv/bin/python3 scripts/setup_grafana.py; \
-	fi
-
-test-integration:
-	@echo "$(GREEN)Running integration tests...$(RESET)"
-	@if [ -f "venv/bin/python" ]; then \
-		./venv/bin/python -m pytest tests/test_integration.py -v; \
-	else \
-		./venv/bin/python3 -m pytest tests/test_integration.py -v; \
 	fi
 
 deploy-gcp:

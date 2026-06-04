@@ -2,7 +2,8 @@
 Rutas de autenticación para la API
 """
 
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, g, jsonify, request
+
 from src.auth.security import security_manager, token_required
 
 auth_bp = Blueprint("auth", __name__)
