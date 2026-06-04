@@ -2,15 +2,15 @@
 Módulo para autenticación y seguridad
 """
 
-import os
-import jwt
 import hashlib
-import secrets
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
-from functools import wraps
-from flask import request, jsonify, g
 import logging
+import os
+from datetime import datetime, timedelta, timezone
+from functools import wraps
+from typing import Any, Dict, Optional
+
+import jwt
+from flask import g, jsonify, request
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +31,8 @@ class SecurityManager:
             "user_id": user_id,
             "username": username,
             "roles": roles,
-            "exp": datetime.utcnow() + timedelta(hours=self.token_expiry),
-            "iat": datetime.utcnow(),
+            "exp": datetime.now(timezone.utc) + timedelta(hours=self.token_expiry),
+            "iat": datetime.now(timezone.utc),
         }
 
         return jwt.encode(payload, self.secret_key, algorithm="HS256")

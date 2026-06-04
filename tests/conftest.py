@@ -2,9 +2,10 @@
 Configuración global de pytest
 """
 
-import pytest
-import sys
 import os
+import sys
+
+import pytest
 
 # Agregar el directorio src al path
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))

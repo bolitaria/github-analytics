@@ -1,5 +1,7 @@
 from functools import wraps
-from flask import request, jsonify
+
+from flask import jsonify, request
+
 from src.auth.utils import decode_token
 
 
@@ -13,7 +15,7 @@ def token_required(f):
         payload = decode_token(token)
         if not payload:
             return jsonify({"error": "Invalid or expired token"}), 401
-        request.user = payload
-        return f(*args, **kwargs)
+        # Payload debe contener "username" y "role"
+        return f(payload, *args, **kwargs)
 
     return decorated

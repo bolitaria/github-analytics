@@ -1,17 +1,17 @@
-import jwt
-import bcrypt
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+
+import bcrypt
+import jwt
+
 from src.config.settings import settings
 
-SECRET_KEY = settings.JWT_SECRET_KEY
-ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = getattr(settings, "JWT_ACCESS_TOKEN_EXPIRE_MINUTES", 1440)
 
 
 def hash_password(password: str) -> str:
     salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
+    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
 
 
 def check_password(password: str, hashed: str) -> bool:
@@ -24,13 +24,13 @@ def create_token(username: str, role: str) -> str:
         "role": role,
         "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
+    return token
 
 
-def decode_token(token: str) -> Optional[Dict[str, Any]]:
+def decode_token(token: str):
     try:
-        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except jwt.ExpiredSignatureError:
-        return None
-    except jwt.InvalidTokenError:
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
+        return payload
+    except jwt.PyJWTError:
         return None

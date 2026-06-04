@@ -24,7 +24,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install linting tools
-        run: pip install black isort flake8
+        run: |
+          python -m pip install --upgrade pip
+          pip install black isort flake8
       - name: Run black
         run: black --check src/ tests/
       - name: Run isort
@@ -46,7 +48,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
       - name: Run unit tests (attempt ${{ matrix.repeat }})
         id: test
         continue-on-error: true
@@ -105,7 +109,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
       - name: Run integration tests for ${{ matrix.db }}
         run: |
           pytest tests/integration -v -k "${{ matrix.db }}" || echo "No integration tests for ${{ matrix.db }} yet"
@@ -124,7 +130,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install Safety
         run: pip install safety
-      - name: Check dependencies
+      - name: Check dependencies for vulnerabilities
         run: safety check --full-report
       - name: Install Bandit
         run: pip install bandit
@@ -178,7 +184,7 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '⚠️ **Potential flaky tests detected**\n\nUnit tests failed in ${{ steps.analyze.outputs.failures }} out of 5 runs. Please review the test suite for nondeterministic behaviour.'
+              body: '**Potential flaky tests detected**\n\nUnit tests failed in ${{ steps.analyze.outputs.failures }} out of 5 runs. Please review the test suite for nondeterministic behaviour.'
             })
 
   notify:
