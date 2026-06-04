@@ -1,6 +1,8 @@
 # src/auth/middleware.py
 from functools import wraps
-from flask import request, jsonify, g
+
+from flask import g, jsonify, request
+
 from .utils import verify_token
 
 

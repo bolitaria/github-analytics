@@ -1,7 +1,9 @@
 # src/models/forecast.py
+from datetime import datetime
+
 import pandas as pd
 from prophet import Prophet
-from datetime import datetime
+
 from src.database.clickhouse import clickhouse_client
 from src.utils.logger import logger
 
@@ -14,8 +16,8 @@ def train_and_forecast(repo_name: str, periods: int = 30):
 
     # 1. Obtener datos históricos de la tabla events
     query = f"""
-        SELECT 
-            toDate(created_at) as ds, 
+        SELECT
+            toDate(created_at) as ds,
             count() as y
         FROM github_analytics.events
         WHERE repo_name = '{repo_name}'
@@ -72,7 +74,7 @@ def save_predictions(predictions: list):
         return
 
     query = """
-    INSERT INTO github_analytics.forecasts 
+    INSERT INTO github_analytics.forecasts
     (repository, forecast_date, predicted_events, lower_bound, upper_bound, model_type, training_date)
     VALUES
     """

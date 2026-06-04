@@ -2,9 +2,9 @@
 Módulo para métricas avanzadas y KPIs de GitHub
 """
 
-from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
 import logging
+from typing import Any, Dict, List
+
 from src.database.clickhouse_client import ClickHouseClient
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ class AdvancedGitHubMetrics:
             count(DISTINCT toDate(created_at)) as active_days,
             round(count(*) / active_days, 2) as events_per_day
         FROM github_events
-        WHERE repo_name = %(repo_name)s 
+        WHERE repo_name = %(repo_name)s
           AND created_at >= now() - INTERVAL %(days)s DAY
         """
 
@@ -92,10 +92,10 @@ class AdvancedGitHubMetrics:
         recent_contributors AS (
             SELECT count(DISTINCT actor_login) as recent_contributors
             FROM github_events
-            WHERE repo_name = %(repo_name)s 
+            WHERE repo_name = %(repo_name)s
               AND created_at >= now() - INTERVAL 90 DAY
         )
-        SELECT 
+        SELECT
             rs.total_events,
             rs.total_contributors,
             rc.recent_contributors,

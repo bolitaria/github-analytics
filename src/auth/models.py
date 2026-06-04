@@ -1,5 +1,5 @@
+from src.auth.utils import check_password, hash_password
 from src.database.clickhouse import clickhouse_client
-from src.auth.utils import hash_password, check_password
 
 
 class User:
