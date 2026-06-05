@@ -45,8 +45,8 @@ jobs:
       clickhouse:
         image: clickhouse/clickhouse-server:23.8
         ports:
-          - 8123:8123      # HTTP para health check
-          - 9001:9000      # Puerto nativo (mapeado al 9001 que espera tu código)
+          - 8123:8123      # HTTP port
+          - 9001:9000      # Native port
         options: >-
           --health-cmd "wget --spider --quiet http://localhost:8123/ping || exit 1"
           --health-interval 10s
@@ -67,12 +67,15 @@ jobs:
         run: |
           for i in {1..30}; do
             if wget --spider --quiet http://localhost:8123/ping; then
-              echo "ClickHouse is ready"
+              echo "ClickHouse HTTP is ready"
               break
             fi
             echo "Waiting for ClickHouse... (attempt $i)"
             sleep 2
           done
+      - name: Create database via HTTP (workaround)
+        run: |
+          wget --post-data "CREATE DATABASE IF NOT EXISTS github_analytics" -qO- http://localhost:8123/ || true
       - name: Initialize ClickHouse tables
         run: python scripts/init_clickhouse.py
         env:
@@ -155,6 +158,10 @@ jobs:
             echo "Waiting for ClickHouse... (attempt $i)"
             sleep 2
           done
+      - name: Create database via HTTP (if needed)
+        if: matrix.db == 'clickhouse'
+        run: |
+          wget --post-data "CREATE DATABASE IF NOT EXISTS github_analytics" -qO- http://localhost:8123/ || true
       - name: Initialize ClickHouse tables (if needed)
         if: matrix.db == 'clickhouse'
         run: python scripts/init_clickhouse.py
