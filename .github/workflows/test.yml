@@ -6,14 +6,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  tests:
+  quick-tests:
     runs-on: ubuntu-latest
     services:
       clickhouse:
         image: clickhouse/clickhouse-server:23.8
         ports:
-          - 8123:8123      # HTTP para health check
-          - 9001:9000      # Puerto nativo (mapeado al 9001 que espera tu código)
+          - 8123:8123
+          - 9001:9000
         options: >-
           --health-cmd "wget --spider --quiet http://localhost:8123/ping || exit 1"
           --health-interval 10s
@@ -28,7 +28,7 @@ jobs:
           python-version: '3.12'
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Wait for ClickHouse HTTP
+      - name: Wait for ClickHouse
         run: |
           for i in {1..30}; do
             if wget --spider --quiet http://localhost:8123/ping; then
@@ -48,13 +48,13 @@ jobs:
         env:
           CLICKHOUSE_HOST: localhost
           CLICKHOUSE_PORT: 9001
-      - name: Lint (quick, non-blocking)
+      - name: Lint (non-blocking)
         run: |
           pip install black isort flake8
           black --check src/ tests/ || true
           isort --check-only src/ tests/ || true
           flake8 src/ tests/ --max-line-length=120 || true
-      - name: Run unit tests (skip DB-dependent ones)
+      - name: Run unit tests (skip DB-dependent)
         run: pytest tests/ -v --ignore=tests/integration --ignore=tests/test_etl.py
       - name: Run integration tests (ClickHouse only)
         run: pytest tests/integration -v
