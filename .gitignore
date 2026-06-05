@@ -141,3 +141,7 @@ notebooks/
 
 # Ruff
 .ruff_cache/
+
+# Allow example / template files (so they can be versioned)
+!*.example
+!*.template

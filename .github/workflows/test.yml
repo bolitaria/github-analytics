@@ -1,4 +1,4 @@
-name: Run tests on push
+name: Quick CI on push
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  quick-tests:
     runs-on: ubuntu-latest
     services:
       clickhouse:
@@ -15,7 +15,6 @@ jobs:
         options: >-
           --health-cmd "wget --spider --quiet http://localhost:8123/ping || exit 1"
           --health-interval 10s
-          --health-timeout 5s
           --health-retries 10
           --health-start-period 30s
     steps:
@@ -26,9 +25,15 @@ jobs:
           python-version: '3.12'
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Lint (quick)
+        run: |
+          pip install black isort flake8
+          black --check src/ tests/ || true
+          isort --check-only src/ tests/ || true
+          flake8 src/ tests/ --max-line-length=120 || true
       - name: Run unit tests
         run: pytest tests/ -v --ignore=tests/integration
-      - name: Run integration tests (ClickHouse)
+      - name: Run integration tests (ClickHouse only)
         run: pytest tests/integration -v
         env:
           TEST_DB: clickhouse

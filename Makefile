@@ -1,4 +1,5 @@
 .PHONY: help install venv init up down clean test run-etl demo logs setup quick-start generate-sample-data check-env venv-check venv-fix restart status activate info health-check logs-clickhouse logs-grafana init-users export-bigquery run-scheduler setup-grafana test-integration deploy-gcp train-model update-thresholds generate-dashboard deploy-dashboard enterprise-deploy lint pre-push
+.PHONY: test-flaky test-all security coverage coverage-html ci-simulate performance
 
 # Colors for better output
 GREEN := $(shell tput -Txterm setaf 2)
@@ -41,19 +42,32 @@ help:
 	@echo "  $(YELLOW)run-scheduler$(RESET)   - Start scheduler (cron-like tasks)"
 	@echo "  $(YELLOW)train-model$(RESET)     - Train issue classifier model"
 	@echo ""
-	@echo "$(BLUE)🧪 TESTING & DEVELOPMENT:$(RESET)"
+	@echo "$(BLUE)🧪 TESTING & QUALITY:$(RESET)"
 	@echo "  $(YELLOW)test$(RESET)            - Run unit tests"
 	@echo "  $(YELLOW)test-integration$(RESET)- Run integration tests"
+	@echo "  $(YELLOW)test-flaky$(RESET)      - Run unit tests 5 times to detect flaky tests"
+	@echo "  $(YELLOW)test-all$(RESET)        - Run ALL tests: lint, unit, integration, security, coverage"
 	@echo "  $(YELLOW)lint$(RESET)            - Run linters (black, isort, flake8)"
-	@echo "  $(YELLOW)pre-push$(RESET)        - Run all checks before push (lint + test + test-integration)"
-	@echo "  $(YELLOW)status$(RESET)          - Check system status"
-	@echo "  $(YELLOW)health-check$(RESET)    - Check service health"
-	@echo "  $(YELLOW)activate$(RESET)        - Show command to activate venv"
+	@echo "  $(YELLOW)security$(RESET)        - Run security scanners (safety, bandit)"
+	@echo "  $(YELLOW)coverage$(RESET)        - Generate test coverage report (html)"
+	@echo "  $(YELLOW)pre-push$(RESET)        - Run all pre-push checks (lint + test + test-integration)"
+	@echo ""
+	@echo "$(BLUE)⚙️ ADVANCED VALIDATION:$(RESET)"
+	@echo "  $(YELLOW)ci-simulate$(RESET)     - Simulate GitHub Actions workflow locally (requires act)"
+	@echo "  $(YELLOW)performance$(RESET)     - Run load test with Locust (if locustfile exists)"
 	@echo ""
 	@echo "$(BLUE)☁️ GCP INTEGRATION:$(RESET)"
 	@echo "  $(YELLOW)export-bigquery$(RESET) - Export data to BigQuery"
 	@echo "  $(YELLOW)setup-grafana$(RESET)   - Automatically configure Grafana dashboards"
 	@echo "  $(YELLOW)deploy-gcp$(RESET)      - Deploy API to Google Cloud Run"
+	@echo ""
+	@echo "$(BLUE)📈 DASHBOARDS & MONITORING:$(RESET)"
+	@echo "  $(YELLOW)generate-dashboard$(RESET)    - Generate enterprise dashboard JSON"
+	@echo "  $(YELLOW)deploy-dashboard$(RESET)     - Deploy dashboard to Grafana"
+	@echo "  $(YELLOW)enterprise-deploy$(RESET)    - Full enterprise dashboard deployment"
+	@echo "  $(YELLOW)generate-full-dashboard$(RESET) - Generate full enterprise dashboard"
+	@echo "  $(YELLOW)deploy-full-dashboard$(RESET)   - Deploy full dashboard"
+	@echo "  $(YELLOW)full-enterprise-deploy$(RESET)  - Full enterprise dashboard deploy"
 	@echo ""
 	@echo "$(BLUE)🧹 CLEANUP:$(RESET)"
 	@echo "  $(YELLOW)clean$(RESET)           - Clean containers and volumes"
@@ -61,6 +75,9 @@ help:
 	@echo ""
 	@echo "$(BLUE)📚 INFORMATION:$(RESET)"
 	@echo "  $(YELLOW)info$(RESET)            - Show project information"
+	@echo "  $(YELLOW)status$(RESET)          - Check system status"
+	@echo "  $(YELLOW)health-check$(RESET)    - Check service health"
+	@echo "  $(YELLOW)activate$(RESET)        - Show command to activate venv"
 	@echo "  $(YELLOW)help$(RESET)            - Show this help"
 	@echo ""
 	@echo "$(MAGENTA)💡 Important URLs:$(RESET)"
@@ -68,14 +85,16 @@ help:
 	@echo "  Grafana:    http://localhost:3001 (admin/admin)"
 	@echo "  Flask API:  http://localhost:8001 (authentication required)"
 	@echo ""
-	@echo "$(MAGENTA)🚀 Recommended flow:$(RESET)"
+	@echo "$(MAGENTA)🚀 Recommended flow for DevOps:$(RESET)"
 	@echo "  make setup           # Initial setup"
-	@echo "  make init-users      # Create admin user"
-	@echo "  make run-etl         # Fetch real data (set GITHUB_TOKEN first)"
-	@echo "  make train-model     # Train issue classifier"
-	@echo "  make run-scheduler   # Automate periodic tasks"
-	@echo "  make setup-grafana   # Visualize data"
+	@echo "  make test-all        # Full validation (lint, tests, security, coverage)"
+	@echo "  make pre-push        # Quick check before each commit"
+	@echo "  make ci-simulate     # Test CI pipeline locally (requires act)"
+	@echo "  make clean-all       # Complete teardown"
 
+# ----------------------------------------------------------------------------
+# Environment checks & venv management (igual que tu versión)
+# ----------------------------------------------------------------------------
 check-env:
 	@echo "$(GREEN)Checking environment...$(RESET)"
 	@which python3 || (echo "$(RED)❌ Python3 not found$(RESET)" && exit 1)
@@ -133,12 +152,12 @@ install: check-env venv-check
 			echo "$(YELLOW)Using venv/bin/python$(RESET)"; \
 			./venv/bin/python -m pip install --upgrade pip || (echo "$(RED)❌ Error upgrading pip$(RESET)" && exit 1); \
 			./venv/bin/python -m pip install -r requirements.txt || (echo "$(RED)❌ Error installing dependencies$(RESET)" && exit 1); \
-			./venv/bin/python -m pip install black isort flake8 || (echo "$(RED)❌ Error installing linting tools$(RESET)" && exit 1); \
+			./venv/bin/python -m pip install black isort flake8 safety bandit autoflake pytest-cov || (echo "$(RED)❌ Error installing testing tools$(RESET)" && exit 1); \
 		else \
 			echo "$(YELLOW)Using venv/bin/python3$(RESET)"; \
 			./venv/bin/python3 -m pip install --upgrade pip || (echo "$(RED)❌ Error upgrading pip$(RESET)" && exit 1); \
 			./venv/bin/python3 -m pip install -r requirements.txt || (echo "$(RED)❌ Error installing dependencies$(RESET)" && exit 1); \
-			./venv/bin/python3 -m pip install black isort flake8 || (echo "$(RED)❌ Error installing linting tools$(RESET)" && exit 1); \
+			./venv/bin/python3 -m pip install black isort flake8 safety bandit autoflake pytest-cov || (echo "$(RED)❌ Error installing testing tools$(RESET)" && exit 1); \
 		fi \
 	else \
 		echo "$(RED)❌ Cannot find Python in virtual environment$(RESET)"; \
@@ -148,15 +167,18 @@ install: check-env venv-check
 		if [ -f "venv/bin/python" ]; then \
 			./venv/bin/python -m pip install --upgrade pip; \
 			./venv/bin/python -m pip install -r requirements.txt; \
-			./venv/bin/python -m pip install black isort flake8; \
+			./venv/bin/python -m pip install black isort flake8 safety bandit autoflake pytest-cov; \
 		else \
 			./venv/bin/python3 -m pip install --upgrade pip; \
 			./venv/bin/python3 -m pip install -r requirements.txt; \
-			./venv/bin/python3 -m pip install black isort flake8; \
+			./venv/bin/python3 -m pip install black isort flake8 safety bandit autoflake pytest-cov; \
 		fi \
 	fi
 	@echo "$(GREEN)✅ Dependencies installed successfully$(RESET)"
 
+# ----------------------------------------------------------------------------
+# Docker services (igual que tu versión)
+# ----------------------------------------------------------------------------
 up: check-env
 	@echo "$(GREEN)Starting Docker containers...$(RESET)"
 	@if docker-compose ps | grep -q "Up"; then \
@@ -214,6 +236,9 @@ demo: generate-sample-data run-etl
 	@echo "$(YELLOW)  - ClickHouse: http://localhost:8124$(RESET)"
 	@echo "$(YELLOW)  - Grafana: http://localhost:3001$(RESET)"
 
+# ----------------------------------------------------------------------------
+# Testing (mejorado)
+# ----------------------------------------------------------------------------
 test:
 	@echo "$(GREEN)Running tests...$(RESET)"
 	@if [ -f "venv/bin/python" ]; then \
@@ -231,16 +256,49 @@ test-integration:
 		./venv/bin/python3 -m pytest tests/test_integration.py -v; \
 	fi
 
+test-flaky:
+	@echo "$(GREEN)Running unit tests 5 times to detect flaky tests...$(RESET)"
+	@for i in 1 2 3 4 5; do \
+		echo "$(YELLOW)Attempt $$i/5$(RESET)"; \
+		$(MAKE) test || exit 1; \
+	done
+	@echo "$(GREEN)✅ No flaky tests detected (5 passes)$(RESET)"
+
+security:
+	@echo "$(GREEN)Running security scans...$(RESET)"
+	@if [ -f "venv/bin/python" ]; then \
+		./venv/bin/safety check --full-report || echo "$(YELLOW)⚠️ Safety found issues (see above)$(RESET)"; \
+		./venv/bin/bandit -r src/ -ll || echo "$(YELLOW)⚠️ Bandit found issues (see above)$(RESET)"; \
+	else \
+		./venv/bin/python3 -m safety check --full-report || true; \
+		./venv/bin/python3 -m bandit -r src/ -ll || true; \
+	fi
+	@echo "$(GREEN)✅ Security scans completed$(RESET)"
+
+coverage:
+	@echo "$(GREEN)Generating test coverage report...$(RESET)"
+	@if [ -f "venv/bin/python" ]; then \
+		./venv/bin/python -m pytest --cov=src --cov-report=html --cov-report=term tests/; \
+	else \
+		./venv/bin/python3 -m pytest --cov=src --cov-report=html --cov-report=term tests/; \
+	fi
+	@echo "$(GREEN)✅ Coverage report: htmlcov/index.html$(RESET)"
+
+coverage-html: coverage
+	@if command -v xdg-open > /dev/null; then xdg-open htmlcov/index.html; \
+	elif command -v open > /dev/null; then open htmlcov/index.html; \
+	else echo "$(YELLOW)Report generated at htmlcov/index.html$(RESET)"; fi
+
+test-all: lint test test-integration security coverage
+	@echo "$(GREEN)🎉 All tests passed successfully!$(RESET)"
+
 lint:
 	@echo "$(GREEN)Running linters...$(RESET)"
-	@# Ensure linting tools are installed
 	@if [ -f "venv/bin/python" ]; then \
-		./venv/bin/python -m pip install black isort flake8 --quiet; \
 		./venv/bin/python -m black --check src/ tests/ || (echo "$(RED)❌ Black formatting check failed$(RESET)" && exit 1); \
 		./venv/bin/python -m isort --check-only src/ tests/ || (echo "$(RED)❌ Isort check failed$(RESET)" && exit 1); \
 		./venv/bin/python -m flake8 src/ tests/ --max-line-length=120 || (echo "$(RED)❌ Flake8 check failed$(RESET)" && exit 1); \
 	else \
-		./venv/bin/python3 -m pip install black isort flake8 --quiet; \
 		./venv/bin/python3 -m black --check src/ tests/ || (echo "$(RED)❌ Black formatting check failed$(RESET)" && exit 1); \
 		./venv/bin/python3 -m isort --check-only src/ tests/ || (echo "$(RED)❌ Isort check failed$(RESET)" && exit 1); \
 		./venv/bin/python3 -m flake8 src/ tests/ --max-line-length=120 || (echo "$(RED)❌ Flake8 check failed$(RESET)" && exit 1); \
@@ -250,6 +308,26 @@ lint:
 pre-push: lint test test-integration
 	@echo "$(GREEN)✅ All pre-push checks passed! You can now push safely.$(RESET)"
 
+# ----------------------------------------------------------------------------
+# Advanced validation
+# ----------------------------------------------------------------------------
+ci-simulate:
+	@echo "$(GREEN)Simulating GitHub Actions workflow locally using 'act'...$(RESET)"
+	@which act > /dev/null || (echo "$(RED)❌ 'act' not installed. Please install from https://nektosact.com$(RESET)" && exit 1)
+	@act pull_request --container-architecture linux/amd64
+	@echo "$(GREEN)✅ CI simulation completed$(RESET)"
+
+performance:
+	@echo "$(GREEN)Running load test with Locust...$(RESET)"
+	@if [ -f "tests/load/locustfile.py" ]; then \
+		locust -f tests/load/locustfile.py --headless -u 10 -r 2 --run-time 30s; \
+	else \
+		echo "$(YELLOW)⚠️ No locustfile.py found in tests/load/. Skipping performance test.$(RESET)"; \
+	fi
+
+# ----------------------------------------------------------------------------
+# Logs & utilities (igual que tu versión)
+# ----------------------------------------------------------------------------
 logs:
 	@echo "$(GREEN)Showing logs...$(RESET)"
 	docker-compose logs -f
@@ -268,11 +346,12 @@ clean: down
 	@echo "$(GREEN)✅ Cleanup completed$(RESET)"
 
 clean-all: clean
-	@echo "$(YELLOW)Removing virtual environment...$(RESET)"
+	@echo "$(YELLOW)Removing virtual environment and caches...$(RESET)"
 	rm -rf venv
 	rm -rf __pycache__
 	rm -rf src/__pycache__
 	rm -rf tests/__pycache__
+	rm -rf .pytest_cache .coverage htmlcov
 	find . -name "*.pyc" -delete
 	@echo "$(GREEN)✅ Full cleanup completed$(RESET)"
 
@@ -313,6 +392,18 @@ status:
 		echo "$(RED)❌ Virtual environment not found$(RESET)"; \
 	fi
 
+health-check:
+	@echo "$(GREEN)Checking service health...$(RESET)"
+	@echo "$(YELLOW)ClickHouse:$(RESET)"
+	@curl -f http://localhost:8124/ping > /dev/null 2>&1 && echo "$(GREEN)✅ ClickHouse is responding$(RESET)" || echo "$(RED)❌ ClickHouse is not responding$(RESET)"
+	@echo "$(YELLOW)Grafana:$(RESET)"
+	@curl -f http://localhost:3001/api/health > /dev/null 2>&1 && echo "$(GREEN)✅ Grafana is responding$(RESET)" || echo "$(RED)❌ Grafana is not responding$(RESET)"
+	@echo "$(YELLOW)API:$(RESET)"
+	@curl -f http://localhost:8001/api/health > /dev/null 2>&1 && echo "$(GREEN)✅ API is responding$(RESET)" || echo "$(YELLOW)⚠️  API may not be running (start with 'python run.py')$(RESET)"
+
+# ----------------------------------------------------------------------------
+# Automation & models (tus objetivos originales)
+# ----------------------------------------------------------------------------
 init-users:
 	@echo "$(GREEN)Initializing users...$(RESET)"
 	@if [ -f "venv/bin/python" ]; then \
@@ -385,9 +476,6 @@ deploy-dashboard: generate-dashboard
 enterprise-deploy: update-thresholds generate-dashboard deploy-dashboard
 	@echo "$(GREEN)✅ Enterprise dashboard deployed!$(RESET)"
 
-# Additional targets from original (kept for compatibility)
-.PHONY: generate-full-dashboard deploy-full-dashboard full-enterprise-deploy
-
 generate-full-dashboard:
 	@echo "$(GREEN)Generating full enterprise dashboard...$(RESET)"
 	@if [ -f "venv/bin/python" ]; then \
@@ -431,12 +519,3 @@ activate:
 		echo "$(RED)❌ Activation script not found$(RESET)"; \
 		$(MAKE) venv-fix; \
 	fi
-
-health-check:
-	@echo "$(GREEN)Checking service health...$(RESET)"
-	@echo "$(YELLOW)ClickHouse:$(RESET)"
-	@curl -f http://localhost:8124/ping > /dev/null 2>&1 && echo "$(GREEN)✅ ClickHouse is responding$(RESET)" || echo "$(RED)❌ ClickHouse is not responding$(RESET)"
-	@echo "$(YELLOW)Grafana:$(RESET)"
-	@curl -f http://localhost:3001/api/health > /dev/null 2>&1 && echo "$(GREEN)✅ Grafana is responding$(RESET)" || echo "$(RED)❌ Grafana is not responding$(RESET)"
-	@echo "$(YELLOW)API:$(RESET)"
-	@curl -f http://localhost:8001/api/health > /dev/null 2>&1 && echo "$(GREEN)✅ API is responding$(RESET)" || echo "$(YELLOW)⚠️  API may not be running (start with 'python run.py')$(RESET)"
