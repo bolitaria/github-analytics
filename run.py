@@ -8,5 +8,5 @@ if __name__ == "__main__":
     app.run(
         debug=debug_mode,
         host="0.0.0.0",
-        port=int(os.getenv("FLASK_PORT", "8001"))
+        port=int(os.getenv("FLASK_PORT", "8002"))
     )
