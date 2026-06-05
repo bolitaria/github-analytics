@@ -1,5 +1,6 @@
-from src.auth.utils import check_password, hash_password
+from src.auth.utils import hash_password, check_password
 from src.database.clickhouse import clickhouse_client
+from src.utils.logger import logger
 
 
 class User:
@@ -14,7 +15,10 @@ class User:
         ) ENGINE = MergeTree()
         ORDER BY username
         """
-        clickhouse_client.execute_query(query)
+        try:
+            clickhouse_client.execute_query(query)
+        except Exception as e:
+            logger.warning(f"Could not create users table (may already exist): {e}")
 
     @staticmethod
     def create(username: str, password: str, role: str = "user"):
