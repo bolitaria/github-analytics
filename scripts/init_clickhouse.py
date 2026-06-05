@@ -6,7 +6,6 @@ import sys
 import os
 import time
 
-# Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.database.clickhouse import clickhouse_client
@@ -15,16 +14,14 @@ from src.utils.logger import logger
 
 def init_clickhouse():
     """Initialize ClickHouse: create database, tables, and views."""
-    # Wait for ClickHouse to be ready
     logger.info("Waiting for ClickHouse to be ready...")
     time.sleep(5)
 
     try:
-        # Create database
         clickhouse_client.execute_query('CREATE DATABASE IF NOT EXISTS github_analytics')
         logger.info("✅ Database created/exists")
 
-        # Create events table
+        # Events table
         clickhouse_client.execute_query('''
             CREATE TABLE IF NOT EXISTS github_analytics.events
             (
@@ -42,7 +39,7 @@ def init_clickhouse():
         ''')
         logger.info("✅ Table events created")
 
-        # Create daily summary table
+        # Daily summary table
         clickhouse_client.execute_query('''
             CREATE TABLE IF NOT EXISTS github_analytics.daily_summary
             (
@@ -57,7 +54,7 @@ def init_clickhouse():
         ''')
         logger.info("✅ Table daily_summary created")
 
-        # Create forecasts table (with lower/upper bounds)
+        # Forecasts table with all columns expected by save_predictions
         clickhouse_client.execute_query('''
             CREATE TABLE IF NOT EXISTS github_analytics.forecasts
             (
@@ -66,13 +63,15 @@ def init_clickhouse():
                 predicted_events Float64,
                 lower_bound Float64,
                 upper_bound Float64,
+                model_type String,
+                training_date Date,
                 created_at DateTime DEFAULT now()
             ) ENGINE = MergeTree()
             ORDER BY (repository, forecast_date)
         ''')
         logger.info("✅ Table forecasts created")
 
-        # Create users table
+        # Users table
         clickhouse_client.execute_query('''
             CREATE TABLE IF NOT EXISTS github_analytics.users
             (
@@ -85,7 +84,7 @@ def init_clickhouse():
         ''')
         logger.info("✅ Table users created")
 
-        # Create materialized view for daily aggregation
+        # Materialized view
         clickhouse_client.execute_query('''
             CREATE MATERIALIZED VIEW IF NOT EXISTS github_analytics.events_daily_mv
             TO github_analytics.daily_summary AS
