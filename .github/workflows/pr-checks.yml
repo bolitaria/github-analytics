@@ -45,9 +45,10 @@ jobs:
       clickhouse:
         image: clickhouse/clickhouse-server:23.8
         ports:
-          - 9001:9000
+          - 8123:8123      # HTTP port for health check
+          - 9001:9000      # Native protocol port
         options: >-
-          --health-cmd "clickhouse-client --query 'SELECT 1'"
+          --health-cmd "wget --spider --quiet http://localhost:8123/ping || exit 1"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
@@ -62,20 +63,31 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Wait for ClickHouse to be ready
+      - name: Wait for ClickHouse HTTP
         run: |
           for i in {1..30}; do
-            if clickhouse-client --host localhost --port 9001 --query "SELECT 1" 2>/dev/null; then
-              echo "ClickHouse is ready"
+            if wget --spider --quiet http://localhost:8123/ping; then
+              echo "ClickHouse HTTP is ready"
               break
             fi
             echo "Waiting for ClickHouse... (attempt $i)"
             sleep 2
           done
+      - name: Initialize ClickHouse tables
+        run: python scripts/init_clickhouse.py
+        env:
+          CLICKHOUSE_HOST: localhost
+          CLICKHOUSE_PORT: 9001
+      - name: Initialize admin user
+        run: python scripts/init_users.py
+        env:
+          CLICKHOUSE_HOST: localhost
+          CLICKHOUSE_PORT: 9001
       - name: Run unit tests (attempt ${{ matrix.repeat }})
         id: test
         continue-on-error: true
-        run: pytest tests/ -v --ignore=tests/integration --ignore=tests/test_etl.py --maxfail=1
+        # Ignore integration folder and the ETL tests that require live DB (they are covered by integration)
+        run: pytest tests/ -v --maxfail=1 --tb=short --ignore=tests/integration --ignore=tests/test_etl.py
       - name: Record attempt result
         run: echo "attempt=${{ matrix.repeat }} status=${{ steps.test.outcome }}" >> flaky_attempts.txt
       - name: Upload flaky attempts
@@ -97,7 +109,7 @@ jobs:
         image: clickhouse/clickhouse-server:23.8
         ports: ['8123:8123', '9001:9000']
         options: >-
-          --health-cmd "clickhouse-client --query 'SELECT 1'"
+          --health-cmd "wget --spider --quiet http://localhost:8123/ping || exit 1"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
@@ -137,13 +149,25 @@ jobs:
         if: matrix.db == 'clickhouse'
         run: |
           for i in {1..30}; do
-            if clickhouse-client --host localhost --port 9001 --query "SELECT 1" 2>/dev/null; then
+            if wget --spider --quiet http://localhost:8123/ping; then
               echo "ClickHouse is ready"
               break
             fi
             echo "Waiting for ClickHouse... (attempt $i)"
             sleep 2
           done
+      - name: Initialize ClickHouse tables (if needed)
+        if: matrix.db == 'clickhouse'
+        run: python scripts/init_clickhouse.py
+        env:
+          CLICKHOUSE_HOST: localhost
+          CLICKHOUSE_PORT: 9001
+      - name: Initialize admin user (if needed)
+        if: matrix.db == 'clickhouse'
+        run: python scripts/init_users.py
+        env:
+          CLICKHOUSE_HOST: localhost
+          CLICKHOUSE_PORT: 9001
       - name: Run integration tests for ${{ matrix.db }}
         run: |
           pytest tests/integration -v -k "${{ matrix.db }}" || echo "No integration tests for ${{ matrix.db }} yet"
