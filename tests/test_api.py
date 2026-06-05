@@ -1,8 +1,7 @@
-import json
-import os
 import sys
-
+import os
 import pytest
+import json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -12,7 +11,7 @@ from src.auth.utils import create_token
 
 @pytest.fixture
 def client():
-    app = create_app()
+    app = create_app(testing=True)
     app.config["TESTING"] = True
     with app.test_client() as client:
         yield client
@@ -20,7 +19,6 @@ def client():
 
 @pytest.fixture
 def auth_headers():
-    # Use create_token with username and role
     token = create_token("testuser", "admin")
     return {"Authorization": f"Bearer {token}"}
 
