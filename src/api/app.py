@@ -1,10 +1,12 @@
 import os
-import joblib
 from datetime import datetime
-from flask import Flask, request, jsonify
+
+import joblib
+from flask import Flask, jsonify, request
+
+from src.auth.decorators import token_required
 from src.auth.models import User
 from src.auth.utils import create_token
-from src.auth.decorators import token_required
 from src.database.clickhouse import clickhouse_client
 from src.utils.logger import logger
 
