@@ -1,5 +1,6 @@
 import pandas as pd
 from clickhouse_driver import Client
+
 from src.config.settings import settings
 from src.utils.logger import logger
 

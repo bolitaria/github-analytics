@@ -1,15 +1,16 @@
-import sys
-import os
 import json
+import os
+import sys
+from datetime import datetime, timedelta, timezone
+
 import jwt
 import pytest
-from datetime import datetime, timezone, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from src.api.app import create_app
 from src.config.settings import settings
 from src.database.clickhouse import clickhouse_client
-from src.api.app import create_app
 
 
 def get_test_token():
@@ -88,7 +89,7 @@ def test_data_insertion(setup_database):
 
 def test_model_training_and_forecast(setup_database):
     try:
-        from src.models.forecast import train_and_forecast, save_predictions
+        from src.models.forecast import save_predictions, train_and_forecast
     except ImportError:
         pytest.skip("Forecast module not available")
     predictions = train_and_forecast("test/integration", periods=5)
@@ -102,7 +103,7 @@ def test_model_training_and_forecast(setup_database):
 
 def test_api_predictions_endpoint(api_client, setup_database):
     try:
-        from src.models.forecast import train_and_forecast, save_predictions
+        from src.models.forecast import save_predictions, train_and_forecast
 
         predictions = train_and_forecast("test/integration", periods=3)
         if predictions:
