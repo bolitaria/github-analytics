@@ -57,13 +57,15 @@ def init_clickhouse():
         ''')
         logger.info("✅ Table daily_summary created")
 
-        # Create forecasts table
+        # Create forecasts table (with lower/upper bounds)
         clickhouse_client.execute_query('''
             CREATE TABLE IF NOT EXISTS github_analytics.forecasts
             (
                 repository String,
                 forecast_date Date,
                 predicted_events Float64,
+                lower_bound Float64,
+                upper_bound Float64,
                 created_at DateTime DEFAULT now()
             ) ENGINE = MergeTree()
             ORDER BY (repository, forecast_date)
