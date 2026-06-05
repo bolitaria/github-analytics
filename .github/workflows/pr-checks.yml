@@ -45,7 +45,7 @@ jobs:
       clickhouse:
         image: clickhouse/clickhouse-server:23.8
         ports:
-          - 9001:9000   # Mapea el puerto 9000 del contenedor al 9001 en el host
+          - 9001:9000
         options: >-
           --health-cmd "clickhouse-client --query 'SELECT 1'"
           --health-interval 10s
@@ -95,7 +95,7 @@ jobs:
     services:
       clickhouse:
         image: clickhouse/clickhouse-server:23.8
-        ports: ['8123:8123', '9001:9000']   # Mapea el puerto 9001 para consistencia
+        ports: ['8123:8123', '9001:9000']
         options: >-
           --health-cmd "clickhouse-client --query 'SELECT 1'"
           --health-interval 10s
@@ -149,7 +149,7 @@ jobs:
           pytest tests/integration -v -k "${{ matrix.db }}" || echo "No integration tests for ${{ matrix.db }} yet"
         env:
           TEST_DB: ${{ matrix.db }}
-          CLICKHOUSE_PORT: 9001   # Asegura que el cliente use el puerto correcto
+          CLICKHOUSE_PORT: 9001
 
   security:
     name: Security scan (Safety, Bandit, Trivy)
