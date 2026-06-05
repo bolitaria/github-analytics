@@ -45,8 +45,8 @@ jobs:
       clickhouse:
         image: clickhouse/clickhouse-server:23.8
         ports:
-          - 8123:8123      # HTTP port for health check
-          - 9001:9000      # Native protocol port
+          - 8123:8123      # HTTP para health check
+          - 9001:9000      # Puerto nativo (mapeado al 9001 que espera tu código)
         options: >-
           --health-cmd "wget --spider --quiet http://localhost:8123/ping || exit 1"
           --health-interval 10s
@@ -67,7 +67,7 @@ jobs:
         run: |
           for i in {1..30}; do
             if wget --spider --quiet http://localhost:8123/ping; then
-              echo "ClickHouse HTTP is ready"
+              echo "ClickHouse is ready"
               break
             fi
             echo "Waiting for ClickHouse... (attempt $i)"
@@ -86,7 +86,6 @@ jobs:
       - name: Run unit tests (attempt ${{ matrix.repeat }})
         id: test
         continue-on-error: true
-        # Ignore integration folder and the ETL tests that require live DB (they are covered by integration)
         run: pytest tests/ -v --maxfail=1 --tb=short --ignore=tests/integration --ignore=tests/test_etl.py
       - name: Record attempt result
         run: echo "attempt=${{ matrix.repeat }} status=${{ steps.test.outcome }}" >> flaky_attempts.txt
