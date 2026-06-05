@@ -41,6 +41,17 @@ jobs:
     strategy:
       matrix:
         repeat: [1, 2, 3, 4, 5]
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:23.8
+        ports:
+          - 9001:9000   # Mapea el puerto 9000 del contenedor al 9001 en el host
+        options: >-
+          --health-cmd "clickhouse-client --query 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 30s
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -51,6 +62,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+      - name: Wait for ClickHouse
+        run: |
+          for i in {1..30}; do
+            if clickhouse-client --host localhost --port 9001 --query "SELECT 1" 2>/dev/null; then
+              echo "ClickHouse is ready"
+              break
+            fi
+            echo "Waiting for ClickHouse... (attempt $i)"
+            sleep 2
+          done
       - name: Run unit tests (attempt ${{ matrix.repeat }})
         id: test
         continue-on-error: true
@@ -74,9 +95,9 @@ jobs:
     services:
       clickhouse:
         image: clickhouse/clickhouse-server:23.8
-        ports: ['8123:8123', '9000:9000']
+        ports: ['8123:8123', '9001:9000']   # Mapea el puerto 9001 para consistencia
         options: >-
-          --health-cmd "wget --spider --quiet http://localhost:8123/ping || exit 1"
+          --health-cmd "clickhouse-client --query 'SELECT 1'"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
@@ -112,11 +133,23 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+      - name: Wait for ClickHouse (if needed)
+        if: matrix.db == 'clickhouse'
+        run: |
+          for i in {1..30}; do
+            if clickhouse-client --host localhost --port 9001 --query "SELECT 1" 2>/dev/null; then
+              echo "ClickHouse is ready"
+              break
+            fi
+            echo "Waiting for ClickHouse... (attempt $i)"
+            sleep 2
+          done
       - name: Run integration tests for ${{ matrix.db }}
         run: |
           pytest tests/integration -v -k "${{ matrix.db }}" || echo "No integration tests for ${{ matrix.db }} yet"
         env:
           TEST_DB: ${{ matrix.db }}
+          CLICKHOUSE_PORT: 9001   # Asegura que el cliente use el puerto correcto
 
   security:
     name: Security scan (Safety, Bandit, Trivy)
@@ -130,7 +163,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Install Safety
         run: pip install safety
-      - name: Check dependencies for vulnerabilities
+      - name: Check dependencies
         run: safety check --full-report
       - name: Install Bandit
         run: pip install bandit
@@ -184,7 +217,7 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '**Potential flaky tests detected**\n\nUnit tests failed in ${{ steps.analyze.outputs.failures }} out of 5 runs. Please review the test suite for nondeterministic behaviour.'
+              body: '⚠️ **Potential flaky tests detected**\n\nUnit tests failed in ${{ steps.analyze.outputs.failures }} out of 5 runs. Please review the test suite for nondeterministic behaviour.'
             })
 
   notify:
