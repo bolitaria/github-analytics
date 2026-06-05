@@ -25,11 +25,13 @@ else:
     )
 
 
-def create_app():
+def create_app(testing=False):
     app = Flask(__name__)
+    if testing:
+        app.config['TESTING'] = True
 
     # Only create tables if not in testing mode
-    if not app.config.get("TESTING", False):
+    if not app.config.get('TESTING', False):
         User.create_table()
 
     # ------------------------------------------------------------------
