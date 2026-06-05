@@ -28,10 +28,10 @@ else:
 def create_app(testing=False):
     app = Flask(__name__)
     if testing:
-        app.config['TESTING'] = True
+        app.config["TESTING"] = True
 
     # Only create tables if not in testing mode
-    if not app.config.get('TESTING', False):
+    if not app.config.get("TESTING", False):
         User.create_table()
 
     # ------------------------------------------------------------------
@@ -39,7 +39,10 @@ def create_app(testing=False):
     # ------------------------------------------------------------------
     @app.route("/api/health", methods=["GET"])
     def health():
-        return jsonify({"status": "healthy", "timestamp": datetime.utcnow().isoformat()}), 200
+        return (
+            jsonify({"status": "healthy", "timestamp": datetime.utcnow().isoformat()}),
+            200,
+        )
 
     @app.route("/api/auth/login", methods=["POST"])
     def login():
@@ -56,9 +59,15 @@ def create_app(testing=False):
             return jsonify({"error": "Invalid credentials"}), 401
 
         token = create_token(user["username"], user["role"])
-        return jsonify(
-            {"token": token, "user": {"username": user["username"], "role": user["role"]}}
-        ), 200
+        return (
+            jsonify(
+                {
+                    "token": token,
+                    "user": {"username": user["username"], "role": user["role"]},
+                }
+            ),
+            200,
+        )
 
     # ------------------------------------------------------------------
     # Protected endpoints (require JWT)
@@ -95,7 +104,10 @@ def create_app(testing=False):
         """
         try:
             result = clickhouse_client.execute_query(query, {"repo_name": repo_name})
-            data = [{"date": str(row[0]), "events": row[1], "contributors": row[2]} for row in result]
+            data = [
+                {"date": str(row[0]), "events": row[1], "contributors": row[2]}
+                for row in result
+            ]
             return jsonify(data), 200
         except Exception as e:
             logger.error(f"Error fetching activity for {repo_name}: {e}")
@@ -113,7 +125,9 @@ def create_app(testing=False):
         """
         try:
             result = clickhouse_client.execute_query(query, {"repo_name": repo_name})
-            data = [{"forecast_date": str(row[0]), "predicted": row[1]} for row in result]
+            data = [
+                {"forecast_date": str(row[0]), "predicted": row[1]} for row in result
+            ]
             return jsonify(data), 200
         except Exception as e:
             logger.error(f"Error fetching predictions for {repo_name}: {e}")

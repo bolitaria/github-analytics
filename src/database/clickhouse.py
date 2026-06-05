@@ -19,7 +19,7 @@ class ClickHouseClient:
             try:
                 self._client = Client(
                     host=settings.CLICKHOUSE_HOST,
-                    port=settings.CLICKHOUSE_PORT,   # Usa la variable de entorno (9001)
+                    port=settings.CLICKHOUSE_PORT,  # Usa la variable de entorno (9001)
                     user=settings.CLICKHOUSE_USER,
                     password=settings.CLICKHOUSE_PASSWORD,
                     database=settings.CLICKHOUSE_DATABASE,
