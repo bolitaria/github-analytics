@@ -181,6 +181,24 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
 
+  # Nuevo job para CodeQL específico de Python (soluciona el error de JavaScript/TypeScript)
+  codeql:
+    name: CodeQL analysis (Python)
+    runs-on: ubuntu-latest
+    needs: lint
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"
+
   flaky-detection:
     name: Detect flaky tests
     runs-on: ubuntu-latest
@@ -223,7 +241,7 @@ jobs:
   notify:
     name: Notify Slack
     runs-on: ubuntu-latest
-    needs: [lint, unit-tests, integration-matrix, security, flaky-detection]
+    needs: [lint, unit-tests, integration-matrix, security, flaky-detection, codeql]
     if: always()
     steps:
       - name: Check if Slack webhook is configured
