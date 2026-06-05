@@ -16,7 +16,7 @@ def get_test_token():
     payload = {
         "username": "test_user",
         "role": "admin",
-        "exp": datetime.now(timezone.utc) + timedelta(hours=1)
+        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
     }
     secret = settings.JWT_SECRET_KEY or "test_secret_key"
     return jwt.encode(payload, secret, algorithm="HS256")
@@ -25,6 +25,7 @@ def get_test_token():
 @pytest.fixture(scope="module")
 def setup_database():
     from src.database.clickhouse import clickhouse_client as client
+
     client.execute_query("""
         CREATE TABLE IF NOT EXISTS github_analytics.events (
             id String, type String, actor_login String, repo_name String,
@@ -37,24 +38,32 @@ def setup_database():
             created_at DateTime DEFAULT now()
         ) ENGINE = MergeTree() ORDER BY (repository, forecast_date)
     """)
-    client.execute_query("ALTER TABLE github_analytics.events DELETE WHERE repo_name = 'test/integration'")
+    client.execute_query(
+        "ALTER TABLE github_analytics.events DELETE WHERE repo_name = 'test/integration'"
+    )
     base_time = datetime.now(timezone.utc) - timedelta(days=5)
     sample_events = []
     for i in range(50):
         event_time = base_time + timedelta(hours=i)
-        sample_events.append({
-            "id": f"int_test_{i}",
-            "type": "PushEvent",
-            "actor_login": f"tester_{i % 3}",
-            "repo_name": "test/integration",
-            "created_at": event_time,
-            "payload": json.dumps({"push_id": i}),
-            "org_login": None
-        })
+        sample_events.append(
+            {
+                "id": f"int_test_{i}",
+                "type": "PushEvent",
+                "actor_login": f"tester_{i % 3}",
+                "repo_name": "test/integration",
+                "created_at": event_time,
+                "payload": json.dumps({"push_id": i}),
+                "org_login": None,
+            }
+        )
     client.insert_batch("github_analytics.events", sample_events)
     yield
-    client.execute_query("ALTER TABLE github_analytics.events DELETE WHERE repo_name = 'test/integration'")
-    client.execute_query("ALTER TABLE github_analytics.forecasts DELETE WHERE repository = 'test/integration'")
+    client.execute_query(
+        "ALTER TABLE github_analytics.events DELETE WHERE repo_name = 'test/integration'"
+    )
+    client.execute_query(
+        "ALTER TABLE github_analytics.forecasts DELETE WHERE repository = 'test/integration'"
+    )
 
 
 @pytest.fixture(scope="module")
@@ -94,6 +103,7 @@ def test_model_training_and_forecast(setup_database):
 def test_api_predictions_endpoint(api_client, setup_database):
     try:
         from src.models.forecast import train_and_forecast, save_predictions
+
         predictions = train_and_forecast("test/integration", periods=3)
         if predictions:
             save_predictions(predictions)
@@ -102,7 +112,7 @@ def test_api_predictions_endpoint(api_client, setup_database):
     token = get_test_token()
     response = api_client.get(
         "/api/predictions/test/integration",
-        headers={"Authorization": f"Bearer {token}"}
+        headers={"Authorization": f"Bearer {token}"},
     )
     if response.status_code == 404:
         pytest.skip("Predictions endpoint not implemented")
@@ -115,16 +125,16 @@ def test_api_classify_endpoint(api_client):
     token = get_test_token()
     payload = {"title": "Fix login bug", "body": "Users cannot authenticate"}
     response = api_client.post(
-        "/api/classify",
-        json=payload,
-        headers={"Authorization": f"Bearer {token}"}
+        "/api/classify", json=payload, headers={"Authorization": f"Bearer {token}"}
     )
     assert response.status_code in (200, 503)
 
 
 def test_api_repos_endpoint(api_client, setup_database):
     token = get_test_token()
-    response = api_client.get("/api/repos", headers={"Authorization": f"Bearer {token}"})
+    response = api_client.get(
+        "/api/repos", headers={"Authorization": f"Bearer {token}"}
+    )
     assert response.status_code == 200
     data = json.loads(response.data)
     assert isinstance(data, list)
