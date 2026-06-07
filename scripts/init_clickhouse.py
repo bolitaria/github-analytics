@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
-
+"""
+Initialize ClickHouse database: create database, tables, and materialized views.
+"""
 import sys
 import os
 import time
 
-# Añadir el directorio raíz al path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.database.clickhouse import clickhouse_client
 from src.utils.logger import logger
+from dotenv import load_dotenv
+load_dotenv()
 
 def init_clickhouse():
-    """Inicializar la base de datos de ClickHouse"""
-    
-    # Esperar a que ClickHouse esté listo
-    logger.info("Esperando que ClickHouse esté listo...")
-    time.sleep(10)
-    
+    """Initialize ClickHouse: create database, tables, and views."""
+    logger.info("Waiting for ClickHouse to be ready...")
+    time.sleep(5)
+
     try:
-        # Crear base de datos
         clickhouse_client.execute_query('CREATE DATABASE IF NOT EXISTS github_analytics')
-        logger.info("✅ Base de datos creada/existe")
-        
-        # Crear tabla de eventos
+        logger.info("✅ Database created/exists")
+
+        # Events table
         clickhouse_client.execute_query('''
             CREATE TABLE IF NOT EXISTS github_analytics.events
             (
@@ -38,9 +38,9 @@ def init_clickhouse():
             PARTITION BY toYYYYMM(created_at)
             ORDER BY (created_at, repo_name, type)
         ''')
-        logger.info("✅ Tabla events creada")
-        
-        # Crear tabla de resumen diario
+        logger.info("✅ Table events created")
+
+        # Daily summary table
         clickhouse_client.execute_query('''
             CREATE TABLE IF NOT EXISTS github_analytics.daily_summary
             (
@@ -53,9 +53,39 @@ def init_clickhouse():
             PARTITION BY toYYYYMM(date)
             ORDER BY (date, repo_name, event_type)
         ''')
-        logger.info("✅ Tabla daily_summary creada")
-        
-        # Crear vista materializada
+        logger.info("✅ Table daily_summary created")
+
+        # Forecasts table with all columns expected by save_predictions
+        clickhouse_client.execute_query('''
+            CREATE TABLE IF NOT EXISTS github_analytics.forecasts
+            (
+                repository String,
+                forecast_date Date,
+                predicted_events Float64,
+                lower_bound Float64,
+                upper_bound Float64,
+                model_type String,
+                training_date Date,
+                created_at DateTime DEFAULT now()
+            ) ENGINE = MergeTree()
+            ORDER BY (repository, forecast_date)
+        ''')
+        logger.info("✅ Table forecasts created")
+
+        # Users table
+        clickhouse_client.execute_query('''
+            CREATE TABLE IF NOT EXISTS github_analytics.users
+            (
+                username String,
+                password_hash String,
+                role String DEFAULT 'user',
+                created_at DateTime DEFAULT now()
+            ) ENGINE = MergeTree()
+            ORDER BY username
+        ''')
+        logger.info("✅ Table users created")
+
+        # Materialized view
         clickhouse_client.execute_query('''
             CREATE MATERIALIZED VIEW IF NOT EXISTS github_analytics.events_daily_mv
             TO github_analytics.daily_summary AS
@@ -68,13 +98,14 @@ def init_clickhouse():
             FROM github_analytics.events
             GROUP BY date, repo_name, event_type
         ''')
-        logger.info("✅ Vista materializada creada")
-        
-        print("🎉 ClickHouse inicializado exitosamente!")
-        
+        logger.info("✅ Materialized view created")
+
+        print("🎉 ClickHouse initialized successfully!")
+
     except Exception as e:
-        logger.error(f"Error inicializando ClickHouse: {e}")
+        logger.error(f"Error initializing ClickHouse: {e}")
         raise
+
 
 if __name__ == '__main__':
     init_clickhouse()

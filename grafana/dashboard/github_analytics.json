@@ -1,0 +1,66 @@
+{
+  "dashboard": {
+    "title": "GitHub Analytics",
+    "tags": ["github", "analytics"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Events over time",
+        "type": "graph",
+        "datasource": "ClickHouse",
+        "targets": [
+          {
+            "refId": "A",
+            "rawSql": "SELECT toDate(created_at) as time, count() as events FROM events WHERE $__timeFilter(created_at) GROUP BY time ORDER BY time",
+            "format": "time_series"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Forecast for nodejs/node",
+        "type": "graph",
+        "datasource": "ClickHouse",
+        "targets": [
+          {
+            "refId": "A",
+            "rawSql": "SELECT forecast_date as time, predicted_events FROM forecasts WHERE repository = 'nodejs/node' ORDER BY time",
+            "format": "time_series"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Issue labels distribution",
+        "type": "piechart",
+        "datasource": "ClickHouse",
+        "targets": [
+          {
+            "refId": "A",
+            "rawSql": "SELECT predicted_label, count() FROM issue_predictions GROUP BY predicted_label ORDER BY count() DESC",
+            "format": "table"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "repository",
+          "type": "query",
+          "datasource": "ClickHouse",
+          "query": "SELECT DISTINCT repo_name FROM events ORDER BY repo_name",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        }
+      ]
+    },
+    "time": { "from": "now-7d", "to": "now" },
+    "refresh": "5m"
+  }
+}

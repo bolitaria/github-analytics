@@ -1,0 +1,300 @@
+{
+  "title": "GitHub Analytics Enterprise",
+  "tags": [
+    "github",
+    "enterprise",
+    "dora",
+    "vodafone"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 27,
+  "version": 0,
+  "panels": [
+    {
+      "id": 1,
+      "title": "\ud83d\ude80 Deployment Frequency (Weekly)",
+      "type": "stat",
+      "datasource": "ClickHouse",
+      "targets": [
+        {
+          "rawSql": "\n                SELECT count() as deployments\n                FROM github_analytics.events\n                WHERE type = 'PullRequestEvent'\n                  AND payload LIKE '%merged%'\n                  AND repo_name IN ($repository)\n                  AND created_at >= now() - interval 7 day\n            ",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 5
+              },
+              {
+                "color": "green",
+                "value": 10
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "title": "\ud83d\udca5 Change Failure Rate (%)",
+      "type": "gauge",
+      "datasource": "ClickHouse",
+      "targets": [
+        {
+          "rawSql": "\n                SELECT \n                    (countIf(payload LIKE '%bug%' OR type = 'IssuesEvent') * 100.0) / count() as cfr\n                FROM github_analytics.events\n                WHERE repo_name IN ($repository)\n                  AND created_at >= now() - interval 7 day\n            ",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 15
+              },
+              {
+                "color": "red",
+                "value": 30
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      }
+    },
+    {
+      "id": 3,
+      "title": "\u23f1\ufe0f MTTR (hours)",
+      "type": "stat",
+      "datasource": "ClickHouse",
+      "targets": [
+        {
+          "rawSql": "\n                SELECT avg(dateDiff('hour', created_at, closed_at))\n                FROM github_analytics.issues\n                WHERE repo_name IN ($repository)\n                  AND state = 'closed'\n                  AND closed_at IS NOT NULL\n                  AND created_at >= now() - interval 30 day\n            ",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 24
+              },
+              {
+                "color": "red",
+                "value": 72
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      }
+    },
+    {
+      "id": 4,
+      "title": "\ud83d\udccc Open Issues",
+      "type": "stat",
+      "datasource": "ClickHouse",
+      "targets": [
+        {
+          "rawSql": "\n                SELECT count()\n                FROM github_analytics.issues\n                WHERE repo_name IN ($repository)\n                  AND state = 'open'\n            ",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 100
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      }
+    },
+    {
+      "id": 5,
+      "title": "\ud83d\udcca Event Traffic (per day)",
+      "type": "timeseries",
+      "datasource": "ClickHouse",
+      "targets": [
+        {
+          "rawSql": "\n                SELECT \n                    toDate(created_at) as time,\n                    count() as events\n                FROM github_analytics.events\n                WHERE repo_name IN ($repository)\n                  AND $__timeFilter(created_at)\n                GROUP BY time\n                ORDER BY time\n            ",
+          "format": "time_series",
+          "legendFormat": "Events"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 100.0
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      }
+    },
+    {
+      "id": 6,
+      "title": "\ud83e\udd67 Issues by Type (last 7d)",
+      "type": "piechart",
+      "datasource": "ClickHouse",
+      "targets": [
+        {
+          "rawSql": "\n                SELECT \n                    arrayJoin(labels) as label,\n                    count() as count\n                FROM github_analytics.issues\n                WHERE repo_name IN ($repository)\n                  AND created_at >= now() - interval 7 day\n                GROUP BY label\n                ORDER BY count DESC\n                LIMIT 10\n            ",
+          "format": "table"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      }
+    },
+    {
+      "id": 7,
+      "title": "\ud83e\ude7a System Health (last 24h)",
+      "type": "table",
+      "datasource": "ClickHouse",
+      "targets": [
+        {
+          "rawSql": "\n                SELECT \n                    'Events (24h)' as metric,\n                    (SELECT count() FROM github_analytics.events WHERE created_at >= now() - interval 1 day) as current,\n                    100.0 as threshold,\n                    if(current > 100.0, '\ud83d\udd34 UNHEALTHY', '\ud83d\udfe2 HEALTHY') as status\n                UNION ALL\n                SELECT \n                    'Issues (24h)',\n                    (SELECT count() FROM github_analytics.issues WHERE created_at >= now() - interval 1 day),\n                    10.0,\n                    if(current > 10.0, '\ud83d\udd34 UNHEALTHY', '\ud83d\udfe2 HEALTHY')\n                UNION ALL\n                SELECT \n                    'Change Failure Rate',\n                    (SELECT (countIf(payload LIKE '%bug%') * 100.0) / count() FROM github_analytics.events WHERE created_at >= now() - interval 1 day),\n                    15,\n                    if(current > 15, '\ud83d\udd34 UNHEALTHY', '\ud83d\udfe2 HEALTHY')\n            ",
+          "format": "table"
+        }
+      ],
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      }
+    },
+    {
+      "id": 8,
+      "title": "\ud83d\udd2e Forecast vs Actual",
+      "type": "timeseries",
+      "datasource": "ClickHouse",
+      "targets": [
+        {
+          "rawSql": "\n                    SELECT \n                        toDate(created_at) as time,\n                        count() as actual\n                    FROM github_analytics.events\n                    WHERE repo_name IN ($repository)\n                      AND created_at >= now() - interval 30 day\n                    GROUP BY time\n                    ORDER BY time\n                ",
+          "format": "time_series",
+          "legendFormat": "Actual"
+        },
+        {
+          "rawSql": "\n                    SELECT \n                        forecast_date as time,\n                        predicted_events as predicted,\n                        lower_bound,\n                        upper_bound\n                    FROM github_analytics.forecasts\n                    WHERE repository IN ($repository)\n                      AND forecast_date >= now() - interval 30 day\n                    ORDER BY time\n                ",
+          "format": "time_series",
+          "legendFormat": "Predicted"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineInterpolation": "smooth",
+            "showPoints": "never"
+          }
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "repository",
+        "type": "query",
+        "datasource": "ClickHouse",
+        "query": "SELECT DISTINCT repo_name FROM github_analytics.events ORDER BY repo_name",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "sort": 1
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "refresh": "5m"
+}

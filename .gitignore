@@ -1,23 +1,153 @@
-# Virtual environment
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distributions / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
 venv/
 env/
+ENV/
+env.bak/
+venv.bak/
+.venv
+.envrc
+virtualenv/
 
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+# Python cache / mypy / pytest
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+.htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+.benchmarks/
+.cache/
 
-# IDE
+# Model files (ML)
+models/*.pkl
+models/*.joblib
+models/*.h5
+models/*.pickle
+*.model
+*.weights
+
+# Data files
+data/
+*.csv
+*.parquet
+*.jsonl
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+backup_*.csv
+sample_*.json
+
+# Secrets / keys
+.env
+.env.local
+.env.production
+.secrets
+credentials/
+!credentials/.gitkeep
+*.pem
+*.key
+*.crt
+*.pub
+*.p12
+cert.pem
+key.pem
+key
+key.pub
+
+# Logs and reports
+*.log
+*.log.*
+logs/
+scheduler.log
+audit.log
+ci_health_report.md
+
+# Local Docker volumes (ignore if mounted locally)
+clickhouse_data/
+grafana_data/
+mysql_data/
+postgres_data/
+*.tar
+*.gz
+
+# IDE / editor files
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+.~lock.*
+.project
+.pydevproject
+*.sublime-*
 
-# Environment variables
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Temporary / backup files
+*.tmp
+temp/
+*.bak
+*.backup
+*.old
+*.orig
+
+# Grafana provisioning (secrets)
+grafana/provisioning/datasources/*.yaml
+
+# GitHub Actions local artifacts
+.github/workflows/logs/
+
+# Jupyter notebooks (optional)
+.ipynb_checkpoints/
+*.ipynb
+notebooks/
+
+# Ruff
+.ruff_cache/
+
+# Allow example / template files (so they can be versioned)
+!*.example
+!*.template
+
+# Metabase driver (binary) and local environment secrets
+drivers/
 .env
-
-# Logs
-*.log
-logs/
-
-# Docker
-docker-compose.override.yml

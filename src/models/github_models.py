@@ -1,6 +1,8 @@
-from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
+from pydantic import BaseModel
+
 
 class GitHubEvent(BaseModel):
     id: str
@@ -11,12 +13,14 @@ class GitHubEvent(BaseModel):
     payload: Dict[str, Any]
     org_login: Optional[str] = None
 
+
 class RepositoryStats(BaseModel):
     repo_name: str
     total_events: int
     unique_contributors: int
     last_activity: datetime
     event_types: Dict[str, int]
+
 
 class ContributorStats(BaseModel):
     username: str

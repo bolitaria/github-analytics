@@ -1,0 +1,63 @@
+name: Quick CI on push
+
+on:
+  push:
+    branches-ignore: [ main ]
+  workflow_dispatch:
+
+jobs:
+  quick-tests:
+    runs-on: ubuntu-latest
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:23.8
+        ports:
+          - 8123:8123
+          - 9001:9000
+        options: >-
+          --health-cmd "wget --spider --quiet http://localhost:8123/ping || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 30s
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Wait for ClickHouse
+        run: |
+          for i in {1..30}; do
+            if wget --spider --quiet http://localhost:8123/ping; then
+              echo "ClickHouse is ready"
+              break
+            fi
+            echo "Waiting for ClickHouse... (attempt $i)"
+            sleep 2
+          done
+      - name: Initialize ClickHouse tables
+        run: python scripts/init_clickhouse.py
+        env:
+          CLICKHOUSE_HOST: localhost
+          CLICKHOUSE_PORT: 9001
+      - name: Initialize admin user
+        run: python scripts/init_users.py
+        env:
+          CLICKHOUSE_HOST: localhost
+          CLICKHOUSE_PORT: 9001
+      - name: Lint (non-blocking)
+        run: |
+          pip install black isort flake8
+          black --check src/ tests/ || true
+          isort --check-only src/ tests/ || true
+          flake8 src/ tests/ --max-line-length=120 || true
+      - name: Run unit tests (skip DB-dependent)
+        run: pytest tests/ -v --ignore=tests/integration --ignore=tests/test_etl.py
+      - name: Run integration tests (ClickHouse only)
+        run: pytest tests/integration -v
+        env:
+          TEST_DB: clickhouse
+          CLICKHOUSE_PORT: 9001

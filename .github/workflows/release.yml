@@ -1,0 +1,104 @@
+name: Release Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write   # necesario para push a GHCR
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and push app image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-app:latest -f Dockerfile .
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-app:latest
+      - name: Build and push ETL image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-etl:latest -f Dockerfile.etl .
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-etl:latest
+
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment:
+      name: staging
+      url: http://staging.example.com
+    steps:
+      - name: Deploy to staging (simulated)
+        run: echo "Deploying to staging environment..."
+
+  smoke-test-staging:
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    steps:
+      - name: Run smoke tests
+        run: |
+          curl -f http://staging.example.com/api/health || exit 1
+
+  wait-approval:
+    runs-on: ubuntu-latest
+    needs: smoke-test-staging
+    environment:
+      name: production
+    steps:
+      - name: Manual approval required
+        run: echo "Waiting for approval from release manager"
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: wait-approval
+    steps:
+      - name: Deploy to production
+        run: echo "Deploying to production..."
+
+  generate-release-report:
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    steps:
+      - name: Generate release report
+        run: |
+          echo "# Release Report" > release_report.md
+          echo "**Date:** $(date)" >> release_report.md
+          echo "**Commit:** ${{ github.sha }}" >> release_report.md
+          echo "**Status:** Deployed to production" >> release_report.md
+          cat release_report.md
+      - name: Upload release report
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-report
+          path: release_report.md
+
+  # Notificación Slack (opcional, solo si el secreto está configurado)
+  notify-slack:
+    runs-on: ubuntu-latest
+    needs: [build-and-push, deploy-staging, smoke-test-staging, wait-approval, deploy-production, generate-release-report]
+    if: always()
+    steps:
+      - name: Check if Slack webhook is configured
+        id: check_slack
+        run: |
+          if [ -z "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+      - name: Send Slack notification
+        if: steps.check_slack.outputs.skip != 'true'
+        uses: slackapi/slack-github-action@v1.25
+        with:
+          payload: |
+            {
+              "text": "Release pipeline finished\nRepo: ${{ github.repository }}\nCommit: ${{ github.sha }}\nStatus: ${{ job.status }}\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
