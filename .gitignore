@@ -73,6 +73,8 @@ sample_*.json
 .env.local
 .env.production
 .secrets
+credentials/
+!credentials/.gitkeep
 *.pem
 *.key
 *.crt
@@ -145,3 +147,7 @@ notebooks/
 # Allow example / template files (so they can be versioned)
 !*.example
 !*.template
+
+# Metabase driver (binary) and local environment secrets
+drivers/
+.env

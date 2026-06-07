@@ -10,7 +10,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.database.clickhouse import clickhouse_client
 from src.utils.logger import logger
-
+from dotenv import load_dotenv
+load_dotenv()
 
 def init_clickhouse():
     """Initialize ClickHouse: create database, tables, and views."""

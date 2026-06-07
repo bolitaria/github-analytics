@@ -1,5 +1,6 @@
 .PHONY: help install venv init up down clean test run-etl demo logs setup quick-start generate-sample-data check-env venv-check venv-fix restart status activate info health-check logs-clickhouse logs-grafana init-users export-bigquery run-scheduler setup-grafana test-integration deploy-gcp train-model update-thresholds generate-dashboard deploy-dashboard enterprise-deploy lint pre-push
 .PHONY: test-flaky test-all security coverage coverage-html ci-simulate performance
+.PHONY: metabase-driver metabase-up metabase-down metabase-logs
 
 # Colors for better output
 GREEN := $(shell tput -Txterm setaf 2)
@@ -24,7 +25,7 @@ help:
 	@echo "  $(YELLOW)install$(RESET)         - Install Python dependencies"
 	@echo ""
 	@echo "$(BLUE)🐳 DOCKER SERVICES:$(RESET)"
-	@echo "  $(YELLOW)up$(RESET)              - Start containers (ClickHouse + Grafana)"
+	@echo "  $(YELLOW)up$(RESET)              - Start containers (ClickHouse + Grafana + API)"
 	@echo "  $(YELLOW)down$(RESET)            - Stop containers"
 	@echo "  $(YELLOW)restart$(RESET)         - Restart containers"
 	@echo "  $(YELLOW)logs$(RESET)            - Show logs of all services"
@@ -50,7 +51,7 @@ help:
 	@echo "  $(YELLOW)lint$(RESET)            - Run linters (black, isort, flake8)"
 	@echo "  $(YELLOW)security$(RESET)        - Run security scanners (safety, bandit)"
 	@echo "  $(YELLOW)coverage$(RESET)        - Generate test coverage report (html)"
-	@echo "  $(YELLOW)pre-push$(RESET)        - Run all pre-push checks (lint + test + test-integration)"
+	@echo "  $(YELLOW)pre-push$(RESET)        - Run all pre-push checks (init-users + lint + test + test-integration)"
 	@echo ""
 	@echo "$(BLUE)⚙️ ADVANCED VALIDATION:$(RESET)"
 	@echo "  $(YELLOW)ci-simulate$(RESET)     - Simulate GitHub Actions workflow locally (requires act)"
@@ -84,6 +85,7 @@ help:
 	@echo "  ClickHouse: http://localhost:8124"
 	@echo "  Grafana:    http://localhost:3001 (admin/admin)"
 	@echo "  Flask API:  http://localhost:8001 (authentication required)"
+	@echo "  Metabase:   http://localhost:3000 (optional, after 'make metabase-up')"
 	@echo ""
 	@echo "$(MAGENTA)🚀 Recommended flow for DevOps:$(RESET)"
 	@echo "  make setup           # Initial setup"
@@ -93,7 +95,7 @@ help:
 	@echo "  make clean-all       # Complete teardown"
 
 # ----------------------------------------------------------------------------
-# Environment checks & venv management (igual que tu versión)
+# Environment checks & venv management
 # ----------------------------------------------------------------------------
 check-env:
 	@echo "$(GREEN)Checking environment...$(RESET)"
@@ -177,7 +179,7 @@ install: check-env venv-check
 	@echo "$(GREEN)✅ Dependencies installed successfully$(RESET)"
 
 # ----------------------------------------------------------------------------
-# Docker services (igual que tu versión)
+# Docker services
 # ----------------------------------------------------------------------------
 up: check-env
 	@echo "$(GREEN)Starting Docker containers...$(RESET)"
@@ -237,7 +239,7 @@ demo: generate-sample-data run-etl
 	@echo "$(YELLOW)  - Grafana: http://localhost:3001$(RESET)"
 
 # ----------------------------------------------------------------------------
-# Testing (mejorado)
+# Testing
 # ----------------------------------------------------------------------------
 test:
 	@echo "$(GREEN)Running tests...$(RESET)"
@@ -305,7 +307,7 @@ lint:
 	fi
 	@echo "$(GREEN)✅ Linting passed$(RESET)"
 
-pre-push: lint test test-integration
+pre-push: init-users lint test test-integration
 	@echo "$(GREEN)✅ All pre-push checks passed! You can now push safely.$(RESET)"
 
 # ----------------------------------------------------------------------------
@@ -326,7 +328,7 @@ performance:
 	fi
 
 # ----------------------------------------------------------------------------
-# Logs & utilities (igual que tu versión)
+# Logs & utilities
 # ----------------------------------------------------------------------------
 logs:
 	@echo "$(GREEN)Showing logs...$(RESET)"
@@ -402,7 +404,7 @@ health-check:
 	@curl -f http://localhost:8001/api/health > /dev/null 2>&1 && echo "$(GREEN)✅ API is responding$(RESET)" || echo "$(YELLOW)⚠️  API may not be running (start with 'python run.py')$(RESET)"
 
 # ----------------------------------------------------------------------------
-# Automation & models (tus objetivos originales)
+# Automation & models
 # ----------------------------------------------------------------------------
 init-users:
 	@echo "$(GREEN)Initializing users...$(RESET)"
@@ -519,3 +521,42 @@ activate:
 		echo "$(RED)❌ Activation script not found$(RESET)"; \
 		$(MAKE) venv-fix; \
 	fi
+
+# ----------------------------------------------------------------------------
+# Metabase add‑on (complementary BI) – local and production
+# ----------------------------------------------------------------------------
+.PHONY: metabase-driver metabase-user metabase-setup metabase-up metabase-down metabase-logs
+.PHONY: metabase-prod-up metabase-prod-down metabase-prod-setup
+
+metabase-driver:
+	@echo "Ensuring ClickHouse JDBC driver for Metabase..."
+	@bash scripts/init_metabase_driver.sh
+
+metabase-user:
+	@echo "Creating dedicated ClickHouse user for Metabase..."
+	@bash scripts/create_metabase_user.sh
+
+metabase-setup: metabase-driver metabase-user
+	@echo "Waiting for Metabase to start and configuring it..."
+	@docker-compose --profile bi up -d metabase-db metabase
+	@bash scripts/setup_metabase.sh
+
+metabase-up:
+	@docker-compose --profile bi up -d metabase-db metabase
+
+metabase-down:
+	@docker-compose --profile bi down
+
+metabase-logs:
+	@docker logs metabase -f
+
+# Production targets (use prod profile, stricter)
+metabase-prod-up:
+	@docker-compose --profile prod up -d metabase-db metabase
+
+metabase-prod-down:
+	@docker-compose --profile prod down
+
+metabase-prod-setup: metabase-driver metabase-user
+	@docker-compose --profile prod up -d metabase-db metabase
+	@bash scripts/setup_metabase.sh
