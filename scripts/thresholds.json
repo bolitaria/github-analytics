@@ -1,9 +1,9 @@
 {
-  "events_per_day": 648.1461726247202,
-  "issues_per_day": 447.02951715063114,
+  "events_per_day": 107.66271363859109,
+  "issues_per_day": 30.237519765257222,
   "cfr_threshold": 15.0,
   "mttr_threshold": 72.0,
   "lead_time_threshold": 72.0,
-  "last_updated": "2026-02-24T17:32:50.262009+00:00",
+  "last_updated": "2026-07-24T15:37:34.814236+00:00",
   "method": "mean + 3\u03c3 (normal distribution)"
 }

@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-import requests
-import os
-import sys
-import time
+import requests, os, sys, time
 from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -25,7 +22,6 @@ def fetch_issues(owner, repo, max_pages=10):
         data = resp.json()
         if not data:
             break
-        # Filter out pull requests (GitHub issues API includes PRs)
         data = [i for i in data if 'pull_request' not in i]
         for i in data:
             labels = [l['name'] for l in i.get('labels', [])]
@@ -43,20 +39,19 @@ def fetch_issues(owner, repo, max_pages=10):
             })
         logger.info(f"Page {page}: {len(data)} issues")
         page += 1
-        time.sleep(0.5)  # Respetar rate limits
+        time.sleep(0.5)
     return issues
 
 def save_issues(issues):
     if not issues:
         return
     query = """
-    INSERT INTO github_analytics.issues 
+    INSERT INTO github_analytics.issues
     (id, number, title, body, labels, state, created_at, closed_at, user_login, repo_name)
     VALUES
     """
     values = []
     for i in issues:
-        # Convertir labels array a string (ClickHouse Array(String) acepta lista Python)
         values.append((
             i['id'], i['number'], i['title'], i['body'],
             i['labels'], i['state'],
@@ -68,11 +63,13 @@ def save_issues(issues):
     logger.info(f"Insertados {len(issues)} issues")
 
 if __name__ == '__main__':
-    repos = [
-        ('ClickHouse', 'ClickHouse'),
-        ('nodejs', 'node'),
-        ('microsoft', 'vscode')
-    ]
+    repos_env = os.getenv('GITHUB_REPOS', '')
+    if repos_env:
+        repos = [r.strip().split('/') for r in repos_env.split(',') if r.strip()]
+        repos = [(owner, repo) for owner, repo in repos]
+    else:
+        # Default hardcoded for standalone script
+        repos = [('ClickHouse', 'ClickHouse'), ('nodejs', 'node'), ('microsoft', 'vscode')]
     for owner, repo in repos:
         logger.info(f"Obteniendo issues de {owner}/{repo}")
         issues = fetch_issues(owner, repo)

@@ -1,3 +1,4 @@
+from dotenv import load_dotenv; load_dotenv()
 #!/usr/bin/env python3
 """
 Deploys a generated dashboard JSON to Grafana via its API.
