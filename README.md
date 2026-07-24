@@ -1,105 +1,105 @@
 # 📊 GitHub Analytics Dashboard
 
-Sistema de analítica en tiempo real para repositorios de GitHub con ClickHouse, Python, Flask y Grafana.  
-Incluye ETL, machine learning, API REST segura, dashboards automatizados, integración con Google Cloud y CI/CD.
+Real-time analytics system for GitHub repositories powered by ClickHouse, Python, Flask and Grafana.  
+Includes ETL pipeline, ML models, secure REST API, automated dashboards, Google Cloud integration and professional CI/CD.
 
-## 🧰 Servicios locales
+## Local services
 
-| Servicio           | URL / puerto               | Acceso                                                   |
-|--------------------|----------------------------|----------------------------------------------------------|
-| Grafana            | http://localhost:3003      | Usuario `admin`. La contraseña se define en docker-compose. |
-| ClickHouse HTTP    | http://localhost:8124/play | Usuario `default`, sin contraseña.                       |
-| ClickHouse nativo  | `localhost:9001`           | Misma autenticación. Usado internamente.                 |
-| Flask API          | http://localhost:8003      | Protegida con JWT.                                       |
-| Metabase (opcional)| http://localhost:3002      | Configuración guiada en el primer acceso.                |
+| Service            | URL / port              | Access                                                    |
+|--------------------|-------------------------|-----------------------------------------------------------|
+| Grafana            | http://localhost:3003   | User `admin`. Password set in docker-compose.             |
+| ClickHouse HTTP    | http://localhost:8124/play | User `default`, no password.                             |
+| ClickHouse native  | `localhost:9001`        | Same credentials. Used internally by the application.     |
+| Flask API          | http://localhost:8003   | JWT protected. See API section.                           |
+| Metabase (optional)| http://localhost:3002   | Follow first-run wizard.                                  |
 
-> **Seguridad:** todas las credenciales se gestionan mediante variables de entorno en `.env` (nunca versionado). Las contraseñas por defecto son solo para desarrollo local.
+> **Security:** all credentials are managed through environment variables in `.env` (never committed). Default passwords are for local development only.
 
-## 🚀 Inicio rápido
+## Quick start
 
-1. Clona e instala:
+1. Clone and install dependencies:
    ```bash
-   git clone <url-del-repo>
+   git clone <repo-url>
    cd github-analytics
    make setup
-Configura el entorno:
+Configure environment:
 
 bash
 cp .env.example .env
-# Edita .env con tu GITHUB_TOKEN y la lista de repositorios (GITHUB_REPOS)
-Demo con datos sintéticos:
+# Edit .env with your GITHUB_TOKEN and GITHUB_REPOS list
+Run demo with synthetic data:
 
 bash
 make demo
-Carga datos reales de GitHub:
+Fetch real GitHub data:
 
 bash
-make run-etl          # eventos de los últimos 30 días
-make fetch-issues     # histórico de issues
-Entrena el modelo de predicción:
+make run-etl          # last 30 days of events
+make fetch-issues     # historical issues
+Train the prediction model:
 
 bash
 make train-model
-Despliega dashboards en Grafana:
+Deploy dashboards to Grafana:
 
 bash
 make setup-grafana
 make full-enterprise-deploy
-Abre http://localhost:3003, inicia sesión y busca el dashboard "GitHub Analytics Enterprise Full".
+Then open http://localhost:3003, log in and open the dashboard "GitHub Analytics Enterprise Full".
 
-📁 Estructura del proyecto
+Project structure
 text
 github-analytics/
-├── .github/workflows/       # CI/CD (checks de PR, release)
+├── .github/workflows/       # CI/CD pipelines (PR checks, release)
 ├── src/
-│   ├── api/                 # Flask + JWT
-│   ├── auth/                # Autenticación y seguridad
-│   ├── database/            # Cliente ClickHouse
-│   ├── etl/                 # ETL de GitHub
-│   ├── models/              # ML (forecasting, clasificación)
-│   └── utils/               # Logging, configuración
-├── scripts/                 # Inicialización, scheduler, despliegue
-├── tests/                   # Unitarios e integración
-├── grafana/dashboards/      # Dashboards JSON
+│   ├── api/                 # Flask + JWT endpoints
+│   ├── auth/                # Authentication & security
+│   ├── database/            # ClickHouse client
+│   ├── etl/                 # GitHub ETL logic
+│   ├── models/              # ML forecasting & classification
+│   └── utils/               # Logging, configuration
+├── scripts/                 # Init, scheduler, deployment helpers
+├── tests/                   # Unit & integration tests
+├── grafana/dashboards/      # Exported dashboard JSONs
 ├── docker-compose.yml
 ├── Makefile
 └── requirements.txt
-🌐 API REST (puerto 8003)
-Todas las rutas protegidas requieren el header Authorization: Bearer <token>.
+REST API (port 8003)
+All protected routes require Authorization: Bearer <token>.
 
-POST /api/auth/login → obtener token
+POST /api/auth/login – obtain token
 
-GET /api/repos → listar repositorios
+GET /api/repos – list repositories
 
-GET /api/repos/<owner>/<repo>/activity → actividad diaria
+GET /api/repos/<owner>/<repo>/activity – daily activity
 
-GET /api/predictions/<owner>/<repo> → predicciones
+GET /api/predictions/<owner>/<repo> – activity forecasts
 
-POST /api/classify → clasificar un issue
+POST /api/classify – classify an issue
 
-Documentación completa en docs/api_documentation.md.
+Full documentation in docs/api_documentation.md.
 
-⚙️ Automatización
-Scheduler (ETL + reentrenamiento periódico): make run-scheduler
+Automation
+Scheduler (periodic ETL + model retraining): make run-scheduler
 
-Exportar a BigQuery: make export-bigquery
+BigQuery export: make export-bigquery
 
-Desplegar en Cloud Run: make deploy-gcp
+Cloud Run deployment: make deploy-gcp
 
-🧪 Testing y CI
+Testing & CI
 bash
-make test              # tests unitarios
-make test-integration  # integración
-make test-all          # lint + tests + seguridad + cobertura
-make pre-push          # comprobaciones antes de push
-El pipeline de GitHub Actions incluye detección de flaky tests, matriz de bases de datos y escaneo de seguridad.
+make test              # unit tests
+make test-integration  # integration tests
+make test-all          # lint + tests + security + coverage
+make pre-push          # pre‑push checks
+The GitHub Actions pipeline includes flaky test detection, database matrix testing and security scans.
 
-🛡️ Seguridad
-Secretos en .env (no incluido en el control de versiones).
+Security
+Secrets stored in .env (excluded from version control).
 
-Autenticación JWT en la API.
+API authentication with JWT.
 
-Contraseñas por defecto solo para desarrollo local; deben cambiarse en producción.
+Default passwords for local development only – change in production.
 
-📄 Licencia
-MIT – ver LICENSE.
+License
+MIT – see LICENSE.
