@@ -150,4 +150,3 @@ notebooks/
 
 # Metabase driver (binary) and local environment secrets
 drivers/
-.env__pycache__/
