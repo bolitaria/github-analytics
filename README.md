@@ -3,7 +3,7 @@
 Real-time analytics system for GitHub repositories powered by ClickHouse, Python, Flask and Grafana.  
 Includes ETL pipeline, ML models, secure REST API, automated dashboards, Google Cloud integration and professional CI/CD.
 
-## Local services
+# Local services
 
 | Service            | URL / port              | Access                                                    |
 |--------------------|-------------------------|-----------------------------------------------------------|
@@ -13,104 +13,87 @@ Includes ETL pipeline, ML models, secure REST API, automated dashboards, Google 
 | Flask API          | http://localhost:8003   | JWT protected. See API section.                           |
 | Metabase (optional)| http://localhost:3002   | Follow first-run wizard.                                  |
 
-> **Security:** all credentials are managed through environment variables in `.env` (never committed). Default passwords are for local development only.
+**Security:** all credentials are managed through environment variables in `.env` (never committed). Default passwords are for local development only.
 
-## Quick start
+# Quick start
 
 1. Clone and install dependencies:
-   ```bash
    git clone <repo-url>
    cd github-analytics
    make setup
-Configure environment:
 
-   ```bash
+2. Configure environment:
    cp .env.example .env
 
-# Edit .env with your GITHUB_TOKEN and GITHUB_REPOS list
-Run demo with synthetic data:
+3. Edit .env with your GITHUB_TOKEN and GITHUB_REPOS list
 
+4. Run demo with synthetic data:
+   make demo
+
+5. Fetch real GitHub data:
+   make run-etl          # last 30 days of events
+   make fetch-issues     # historical issues
+
+6. Train the prediction model:
+   make train-model
+
+7. Deploy dashboards to Grafana:
+   make setup-grafana
+   make full-enterprise-deploy
+
+8. Then open http://localhost:3003, log in and open the dashboard "GitHub Analytics Enterprise Full".
+
+# Project structure
 ```bash
-make demo
+   github-analytics/
+   ├── .github/workflows/       # CI/CD pipelines (PR checks, release)
+   ├── src/
+   │   ├── api/                 # Flask + JWT endpoints
+   │   ├── auth/                # Authentication & security
+   │   ├── database/            # ClickHouse client
+   │   ├── etl/                 # GitHub ETL logic
+   │   ├── models/              # ML forecasting & classification
+   │   └── utils/               # Logging, configuration
+   ├── scripts/                 # Init, scheduler, deployment helpers
+   ├── tests/                   # Unit & integration tests
+   ├── grafana/dashboards/      # Exported dashboard JSONs
+   ├── docker-compose.yml
+   ├── Makefile
+   └── requirements.txt
 
-#Fetch real GitHub data:
+   REST API (port 8003)
 
-```bash
-make run-etl          # last 30 days of events
-make fetch-issues     # historical issues
+   All protected routes require Authorization: Bearer <token>.
 
-#Train the prediction model:
+      POST /api/auth/login – obtain token
+      GET /api/repos – list repositories
+      GET /api/repos/<owner>/<repo>/activity – daily activity
+      GET /api/predictions/<owner>/<repo> – activity forecasts
+      POST /api/classify – classify an issue
 
-```bash
-make train-model
+   Full documentation in docs/api_documentation.md.
 
-#Deploy dashboards to Grafana:
+# Automation
+   Scheduler (periodic ETL + model retraining): make run-scheduler
 
-```bash
-make setup-grafana
-make full-enterprise-deploy
+## BigQuery export:
+   make export-bigquery
 
-#Then open http://localhost:3003, log in and open the dashboard "GitHub Analytics Enterprise Full".
+## Cloud Run deployment:
+   make deploy-gcp
 
-##Project structure
-'''text
-github-analytics/
-├── .github/workflows/       # CI/CD pipelines (PR checks, release)
-├── src/
-│   ├── api/                 # Flask + JWT endpoints
-│   ├── auth/                # Authentication & security
-│   ├── database/            # ClickHouse client
-│   ├── etl/                 # GitHub ETL logic
-│   ├── models/              # ML forecasting & classification
-│   └── utils/               # Logging, configuration
-├── scripts/                 # Init, scheduler, deployment helpers
-├── tests/                   # Unit & integration tests
-├── grafana/dashboards/      # Exported dashboard JSONs
-├── docker-compose.yml
-├── Makefile
-└── requirements.txt
+## Testing & CI
+   make test              # unit tests
+   make test-integration  # integration tests
+   make test-all          # lint + tests + security + coverage
+   make pre-push          # pre‑push checks
+   
+   The GitHub Actions pipeline includes flaky test detection, database matrix testing and security scans.
 
-#REST API (port 8003)
+# Security
+   Secrets stored in .env (excluded from version control).
+   API authentication with JWT.
+   Default passwords for local development only – change in production.
 
-#All protected routes require Authorization: Bearer <token>.
-
-#POST /api/auth/login – obtain token
-
-#GET /api/repos – list repositories
-
-#GET /api/repos/<owner>/<repo>/activity – daily activity
-
-#GET /api/predictions/<owner>/<repo> – activity forecasts
-
-#POST /api/classify – classify an issue
-
-#Full documentation in docs/api_documentation.md.
-
-##Automation
-#Scheduler (periodic ETL + model retraining): make run-scheduler
-
-##BigQuery export:
-```bash
-make export-bigquery
-
-##Cloud Run deployment:
-```bash
-make deploy-gcp
-
-##Testing & CI
-```bash
-make test              # unit tests
-make test-integration  # integration tests
-make test-all          # lint + tests + security + coverage
-make pre-push          # pre‑push checks
-#The GitHub Actions pipeline includes flaky test detection, database matrix testing and security scans.
-
-##Security
-#Secrets stored in .env (excluded from version control).
-
-#API authentication with JWT.
-
-#Default passwords for local development only – change in production.
-
-##License
-#MIT – see LICENSE.
+## License
+   MIT – see LICENSE.
