@@ -18,28 +18,40 @@ Includes ETL pipeline, ML models, secure REST API, automated dashboards, Google 
 # Quick start
 
 1. Clone and install dependencies:
+```bash
    git clone <repo-url>
    cd github-analytics
    make setup
+```
 
 2. Configure environment:
+```bash
    cp .env.example .env
+```
 
 3. Edit .env with your GITHUB_TOKEN and GITHUB_REPOS list
 
-4. Run demo with synthetic data:
+5. Run demo with synthetic data:
+```bash
    make demo
+```
 
 5. Fetch real GitHub data:
+```bash
    make run-etl          # last 30 days of events
    make fetch-issues     # historical issues
+```
 
 6. Train the prediction model:
+```bash
    make train-model
+```
 
 7. Deploy dashboards to Grafana:
+```bash
    make setup-grafana
    make full-enterprise-deploy
+```
 
 8. Then open http://localhost:3003, log in and open the dashboard "GitHub Analytics Enterprise Full".
 
@@ -60,7 +72,7 @@ Includes ETL pipeline, ML models, secure REST API, automated dashboards, Google 
    ├── docker-compose.yml
    ├── Makefile
    └── requirements.txt
-
+```
    REST API (port 8003)
 
    All protected routes require Authorization: Bearer <token>.
@@ -74,20 +86,25 @@ Includes ETL pipeline, ML models, secure REST API, automated dashboards, Google 
    Full documentation in docs/api_documentation.md.
 
 # Automation
-   Scheduler (periodic ETL + model retraining): make run-scheduler
-
+   Scheduler (periodic ETL + model retraining):
+```bash
+   make run-scheduler
+```
 ## BigQuery export:
+```bash
    make export-bigquery
-
+```
 ## Cloud Run deployment:
+```bash
    make deploy-gcp
-
+```
 ## Testing & CI
+```bash
    make test              # unit tests
    make test-integration  # integration tests
    make test-all          # lint + tests + security + coverage
    make pre-push          # pre‑push checks
-   
+```
    The GitHub Actions pipeline includes flaky test detection, database matrix testing and security scans.
 
 # Security
