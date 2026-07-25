@@ -24,31 +24,36 @@ Includes ETL pipeline, ML models, secure REST API, automated dashboards, Google 
    make setup
 Configure environment:
 
-bash
-cp .env.example .env
+   ```bash
+   cp .env.example .env
+
 # Edit .env with your GITHUB_TOKEN and GITHUB_REPOS list
 Run demo with synthetic data:
 
-bash
+```bash
 make demo
-Fetch real GitHub data:
 
-bash
+#Fetch real GitHub data:
+
+```bash
 make run-etl          # last 30 days of events
 make fetch-issues     # historical issues
-Train the prediction model:
 
-bash
+#Train the prediction model:
+
+```bash
 make train-model
-Deploy dashboards to Grafana:
 
-bash
+#Deploy dashboards to Grafana:
+
+```bash
 make setup-grafana
 make full-enterprise-deploy
-Then open http://localhost:3003, log in and open the dashboard "GitHub Analytics Enterprise Full".
 
-Project structure
-text
+#Then open http://localhost:3003, log in and open the dashboard "GitHub Analytics Enterprise Full".
+
+##Project structure
+'''text
 github-analytics/
 ├── .github/workflows/       # CI/CD pipelines (PR checks, release)
 ├── src/
@@ -64,42 +69,48 @@ github-analytics/
 ├── docker-compose.yml
 ├── Makefile
 └── requirements.txt
-REST API (port 8003)
-All protected routes require Authorization: Bearer <token>.
 
-POST /api/auth/login – obtain token
+#REST API (port 8003)
 
-GET /api/repos – list repositories
+#All protected routes require Authorization: Bearer <token>.
 
-GET /api/repos/<owner>/<repo>/activity – daily activity
+#POST /api/auth/login – obtain token
 
-GET /api/predictions/<owner>/<repo> – activity forecasts
+#GET /api/repos – list repositories
 
-POST /api/classify – classify an issue
+#GET /api/repos/<owner>/<repo>/activity – daily activity
 
-Full documentation in docs/api_documentation.md.
+#GET /api/predictions/<owner>/<repo> – activity forecasts
 
-Automation
-Scheduler (periodic ETL + model retraining): make run-scheduler
+#POST /api/classify – classify an issue
 
-BigQuery export: make export-bigquery
+#Full documentation in docs/api_documentation.md.
 
-Cloud Run deployment: make deploy-gcp
+##Automation
+#Scheduler (periodic ETL + model retraining): make run-scheduler
 
-Testing & CI
-bash
+##BigQuery export:
+```bash
+make export-bigquery
+
+##Cloud Run deployment:
+```bash
+make deploy-gcp
+
+##Testing & CI
+```bash
 make test              # unit tests
 make test-integration  # integration tests
 make test-all          # lint + tests + security + coverage
 make pre-push          # pre‑push checks
-The GitHub Actions pipeline includes flaky test detection, database matrix testing and security scans.
+#The GitHub Actions pipeline includes flaky test detection, database matrix testing and security scans.
 
-Security
-Secrets stored in .env (excluded from version control).
+##Security
+#Secrets stored in .env (excluded from version control).
 
-API authentication with JWT.
+#API authentication with JWT.
 
-Default passwords for local development only – change in production.
+#Default passwords for local development only – change in production.
 
-License
-MIT – see LICENSE.
+##License
+#MIT – see LICENSE.
