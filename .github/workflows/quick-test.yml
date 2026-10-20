@@ -62,7 +62,7 @@ jobs:
       - name: Run unit tests (skip DB-dependent)
         run: pytest tests/ -v --ignore=tests/integration --ignore=tests/test_etl.py
       - name: Run integration tests (ClickHouse only)
-        run: pytest tests/integration -v
+        run: pytest tests/test_integration.py -v
         env:
           TEST_DB: clickhouse
           CLICKHOUSE_PORT: 9001

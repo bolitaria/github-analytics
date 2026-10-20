@@ -178,7 +178,7 @@ jobs:
           CLICKHOUSE_PORT: 9001
       - name: Run integration tests for ${{ matrix.db }}
         run: |
-          pytest tests/integration -v -k "${{ matrix.db }}" || echo "No integration tests for ${{ matrix.db }} yet"
+          pytest tests/test_integration.py -v -k "${{ matrix.db }}" || echo "No integration tests for ${{ matrix.db }} yet"
         env:
           TEST_DB: ${{ matrix.db }}
           CLICKHOUSE_PORT: 9001
