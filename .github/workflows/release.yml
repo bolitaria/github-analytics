@@ -1,4 +1,4 @@
-name: Release Pipeline
+name: CI/CD Pipeline
 
 on:
   push:
@@ -14,7 +14,38 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Start ClickHouse
+        run: docker compose up -d clickhouse
+      - name: Wait for ClickHouse
+        run: |
+          for i in {1..30}; do
+            if curl -s http://localhost:8124/ping; then break; fi
+            sleep 2
+          done
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+      - name: Initialize ClickHouse
+        env:
+          CLICKHOUSE_HOST: localhost
+          CLICKHOUSE_PORT: 9001
+        run: |
+          python scripts/init_clickhouse.py
+          python scripts/init_users.py
+      - name: Run tests
+        env:
+          CLICKHOUSE_HOST: localhost
+          CLICKHOUSE_PORT: 9001
+        run: pytest tests/ -v
+
   build-and-push:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -1,0 +1,153 @@
+{
+  "dashboard": {
+    "title": "GitHub Analytics – Automattic",
+    "uid": "auto01",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Event Traffic (per day)",
+        "type": "timeseries",
+        "datasource": {"type": "grafana-clickhouse-datasource", "uid": "eft37m598azuoa"},
+        "targets": [{
+          "rawSql": "SELECT toUnixTimestamp(toStartOfDay(created_at)) * 1000 AS time, count() AS events FROM github_analytics.events WHERE repo_name = '${repo_name:raw}' GROUP BY time ORDER BY time",
+          "format": "time_series",
+          "legendFormat": "Events"
+        }],
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "pointSize": 5, "stacking": { "mode": "none" } }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Top Contributors",
+        "type": "table",
+        "datasource": {"type": "grafana-clickhouse-datasource", "uid": "eft37m598azuoa"},
+        "targets": [{
+          "rawSql": "SELECT actor_login, count() AS events FROM github_analytics.events WHERE repo_name = '${repo_name:raw}' GROUP BY actor_login ORDER BY events DESC LIMIT 10",
+          "format": "table"
+        }],
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}
+      },
+      {
+        "id": 3,
+        "title": "Events by Type",
+        "type": "barchart",
+        "datasource": {"type": "grafana-clickhouse-datasource", "uid": "eft37m598azuoa"},
+        "targets": [{
+          "rawSql": "SELECT type, count() AS total FROM github_analytics.events WHERE repo_name = '${repo_name:raw}' GROUP BY type ORDER BY total DESC",
+          "format": "table"
+        }],
+        "gridPos": {"x": 0, "y": 8, "w": 8, "h": 8}
+      },
+      {
+        "id": 4,
+        "title": "Issues by State",
+        "type": "barchart",
+        "datasource": {"type": "grafana-clickhouse-datasource", "uid": "eft37m598azuoa"},
+        "targets": [{
+          "rawSql": "SELECT state, count() AS total FROM github_analytics.issues WHERE repo_name = '${repo_name:raw}' GROUP BY state ORDER BY total DESC",
+          "format": "table"
+        }],
+        "gridPos": {"x": 8, "y": 8, "w": 8, "h": 8}
+      },
+      {
+        "id": 5,
+        "title": "Top Labels",
+        "type": "bargauge",
+        "datasource": {"type": "grafana-clickhouse-datasource", "uid": "eft37m598azuoa"},
+        "targets": [{
+          "rawSql": "SELECT arrayJoin(labels) AS label, count() AS value FROM github_analytics.issues WHERE repo_name = '${repo_name:raw}' GROUP BY label ORDER BY value DESC LIMIT 10",
+          "format": "table"
+        }],
+        "gridPos": {"x": 16, "y": 8, "w": 8, "h": 8}
+      },
+      {
+        "id": 6,
+        "title": "Issues Created Over Time",
+        "type": "timeseries",
+        "datasource": {"type": "grafana-clickhouse-datasource", "uid": "eft37m598azuoa"},
+        "targets": [{
+          "rawSql": "SELECT toUnixTimestamp(toStartOfDay(created_at)) * 1000 AS time, count() AS issues FROM github_analytics.issues WHERE repo_name = '${repo_name:raw}' GROUP BY time ORDER BY time",
+          "format": "time_series",
+          "legendFormat": "Issues"
+        }],
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1, "pointSize": 5, "stacking": { "mode": "none" } }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "MTTR (hours)",
+        "type": "stat",
+        "datasource": {"type": "grafana-clickhouse-datasource", "uid": "eft37m598azuoa"},
+        "targets": [{
+          "rawSql": "SELECT round(avg(date_diff('second', created_at, closed_at)) / 3600.0, 2) AS mttr_hours FROM github_analytics.issues WHERE closed_at IS NOT NULL AND repo_name = '${repo_name:raw}'",
+          "format": "table"
+        }],
+        "gridPos": {"x": 12, "y": 16, "w": 6, "h": 4},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "h",
+            "decimals": 2
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Open Issues",
+        "type": "stat",
+        "datasource": {"type": "grafana-clickhouse-datasource", "uid": "eft37m598azuoa"},
+        "targets": [{
+          "rawSql": "SELECT count() FROM github_analytics.issues WHERE state = 'open' AND repo_name = '${repo_name:raw}'",
+          "format": "table"
+        }],
+        "gridPos": {"x": 18, "y": 16, "w": 6, "h": 4},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Closed Issues",
+        "type": "stat",
+        "datasource": {"type": "grafana-clickhouse-datasource", "uid": "eft37m598azuoa"},
+        "targets": [{
+          "rawSql": "SELECT count() FROM github_analytics.issues WHERE state = 'closed' AND repo_name = '${repo_name:raw}'",
+          "format": "table"
+        }],
+        "gridPos": {"x": 12, "y": 20, "w": 6, "h": 4},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "repo_name",
+          "type": "query",
+          "query": "SELECT DISTINCT repo_name FROM github_analytics.events ORDER BY repo_name",
+          "multi": false,
+          "includeAll": false,
+          "current": { "text": "Automattic/jetpack", "value": "Automattic/jetpack" },
+          "datasource": {"type": "grafana-clickhouse-datasource", "uid": "eft37m598azuoa"}
+        }
+      ]
+    },
+    "time": {"from": "now-90d", "to": "now"},
+    "schemaVersion": 36
+  },
+  "overwrite": true
+}
