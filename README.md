@@ -1,5 +1,6 @@
 # 📊 GitHub Analytics Dashboard
 
+[![CI/CD Pipeline](https://github.com/bolitaria/github-analytics/actions/workflows/release.yml/badge.svg)](https://github.com/bolitaria/github-analytics/actions/workflows/release.yml)
 Real-time analytics system for GitHub repositories powered by ClickHouse, Python, Flask and Grafana.  
 Includes ETL pipeline, ML models, secure REST API, automated dashboards, Google Cloud integration and professional CI/CD.
 

@@ -38,6 +38,11 @@ jobs:
             echo "Waiting for ClickHouse... (attempt $i)"
             sleep 2
           done
+      - name: Create database via HTTP POST
+        run: |
+          curl -fsS -X POST "http://localhost:8123/" \
+            --data "CREATE DATABASE IF NOT EXISTS github_analytics"
+
       - name: Initialize ClickHouse tables
         run: python scripts/init_clickhouse.py
         env:
@@ -57,7 +62,7 @@ jobs:
       - name: Run unit tests (skip DB-dependent)
         run: pytest tests/ -v --ignore=tests/integration --ignore=tests/test_etl.py
       - name: Run integration tests (ClickHouse only)
-        run: pytest tests/integration -v
+        run: pytest tests/test_integration.py -v
         env:
           TEST_DB: clickhouse
           CLICKHOUSE_PORT: 9001

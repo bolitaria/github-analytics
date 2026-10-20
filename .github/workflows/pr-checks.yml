@@ -73,9 +73,10 @@ jobs:
             echo "Waiting for ClickHouse... (attempt $i)"
             sleep 2
           done
-      - name: Create database via HTTP (workaround)
+      - name: Create database via HTTP (POST, no || true)
         run: |
-          wget --post-data "CREATE DATABASE IF NOT EXISTS github_analytics" -qO- http://localhost:8123/ || true
+          curl -fsS -X POST "http://localhost:8123/" \
+            --data "CREATE DATABASE IF NOT EXISTS github_analytics"
       - name: Initialize ClickHouse tables
         run: python scripts/init_clickhouse.py
         env:
@@ -158,10 +159,11 @@ jobs:
             echo "Waiting for ClickHouse... (attempt $i)"
             sleep 2
           done
-      - name: Create database via HTTP (if needed)
+      - name: Create database via HTTP (POST, no || true)
         if: matrix.db == 'clickhouse'
         run: |
-          wget --post-data "CREATE DATABASE IF NOT EXISTS github_analytics" -qO- http://localhost:8123/ || true
+          curl -fsS -X POST "http://localhost:8123/" \
+            --data "CREATE DATABASE IF NOT EXISTS github_analytics"
       - name: Initialize ClickHouse tables (if needed)
         if: matrix.db == 'clickhouse'
         run: python scripts/init_clickhouse.py
@@ -176,7 +178,7 @@ jobs:
           CLICKHOUSE_PORT: 9001
       - name: Run integration tests for ${{ matrix.db }}
         run: |
-          pytest tests/integration -v -k "${{ matrix.db }}" || echo "No integration tests for ${{ matrix.db }} yet"
+          pytest tests/test_integration.py -v -k "${{ matrix.db }}" || echo "No integration tests for ${{ matrix.db }} yet"
         env:
           TEST_DB: ${{ matrix.db }}
           CLICKHOUSE_PORT: 9001
@@ -194,7 +196,7 @@ jobs:
       - name: Install Safety
         run: pip install safety
       - name: Check dependencies
-        run: safety check --full-report
+        run: safety check --full-report --ignore SFTY-20260902-58666  # CVE-2026-81726 in nltk: path traversal in training methods, not used here
       - name: Install Bandit
         run: pip install bandit
       - name: Run Bandit SAST
