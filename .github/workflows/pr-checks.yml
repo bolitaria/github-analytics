@@ -206,7 +206,7 @@ jobs:
       - name: Run Bandit SAST
         run: bandit -r src/ -ll -f json -o bandit_report.json || true
       - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
