@@ -25,10 +25,17 @@ jobs:
         run: docker compose up -d clickhouse
       - name: Wait for ClickHouse
         run: |
-          for i in {1..30}; do
-            if curl -s http://localhost:8124/ping; then break; fi
+          for i in {1..60}; do
+            if curl -sf http://localhost:8124/ping; then
+              echo "ClickHouse ready"; exit 0
+            fi
             sleep 2
           done
+          echo "ClickHouse did not become ready in 120s"; exit 1
+      - name: Create database via HTTP (POST, not GET)
+        run: |
+          curl -fsS -X POST "http://localhost:8124/" \
+            --data "CREATE DATABASE IF NOT EXISTS github_analytics"
       - name: Install dependencies
         run: pip install -r requirements.txt pytest
       - name: Initialize ClickHouse
