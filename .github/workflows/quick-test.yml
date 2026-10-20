@@ -5,9 +5,14 @@ on:
     branches-ignore: [ main ]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quick-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       clickhouse:
         image: clickhouse/clickhouse-server:23.8
@@ -15,13 +20,13 @@ jobs:
           - 8123:8123
           - 9001:9000
         options: >-
-          --health-cmd "wget --spider --quiet http://localhost:8123/ping || exit 1"
+          --health-cmd "clickhouse-client --query 'SELECT 1'"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
           --health-start-period 30s
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -31,7 +36,7 @@ jobs:
       - name: Wait for ClickHouse
         run: |
           for i in {1..30}; do
-            if wget --spider --quiet http://localhost:8123/ping; then
+            if curl -sf http://localhost:8123/ping; then
               echo "ClickHouse is ready"
               break
             fi
@@ -42,7 +47,6 @@ jobs:
         run: |
           curl -fsS -X POST "http://localhost:8123/" \
             --data "CREATE DATABASE IF NOT EXISTS github_analytics"
-
       - name: Initialize ClickHouse tables
         run: python scripts/init_clickhouse.py
         env:
@@ -53,16 +57,11 @@ jobs:
         env:
           CLICKHOUSE_HOST: localhost
           CLICKHOUSE_PORT: 9001
-      - name: Lint (non-blocking)
-        run: |
-          pip install black isort flake8
-          black --check src/ tests/ || true
-          isort --check-only src/ tests/ || true
-          flake8 src/ tests/ --max-line-length=120 || true
       - name: Run unit tests (skip DB-dependent)
         run: pytest tests/ -v --ignore=tests/integration --ignore=tests/test_etl.py
       - name: Run integration tests (ClickHouse only)
         run: pytest tests/test_integration.py -v
         env:
-          TEST_DB: clickhouse
+          CLICKHOUSE_HOST: localhost
           CLICKHOUSE_PORT: 9001
+          TEST_DB: clickhouse
