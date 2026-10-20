@@ -73,9 +73,10 @@ jobs:
             echo "Waiting for ClickHouse... (attempt $i)"
             sleep 2
           done
-      - name: Create database via HTTP (workaround)
+      - name: Create database via HTTP (POST, no || true)
         run: |
-          wget --post-data "CREATE DATABASE IF NOT EXISTS github_analytics" -qO- http://localhost:8123/ || true
+          curl -fsS -X POST "http://localhost:8123/" \
+            --data "CREATE DATABASE IF NOT EXISTS github_analytics"
       - name: Initialize ClickHouse tables
         run: python scripts/init_clickhouse.py
         env:
@@ -158,10 +159,11 @@ jobs:
             echo "Waiting for ClickHouse... (attempt $i)"
             sleep 2
           done
-      - name: Create database via HTTP (if needed)
+      - name: Create database via HTTP (POST, no || true)
         if: matrix.db == 'clickhouse'
         run: |
-          wget --post-data "CREATE DATABASE IF NOT EXISTS github_analytics" -qO- http://localhost:8123/ || true
+          curl -fsS -X POST "http://localhost:8123/" \
+            --data "CREATE DATABASE IF NOT EXISTS github_analytics"
       - name: Initialize ClickHouse tables (if needed)
         if: matrix.db == 'clickhouse'
         run: python scripts/init_clickhouse.py
