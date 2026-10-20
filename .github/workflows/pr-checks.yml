@@ -196,7 +196,7 @@ jobs:
       - name: Install Safety
         run: pip install safety
       - name: Check dependencies
-        run: safety check --full-report --ignore 58666  # CVE-2026-81726 in nltk: path traversal in training methods, not used here (nltk comes from sumy, no user paths)
+        run: safety check --full-report --ignore SFTY-20260902-58666  # CVE-2026-81726 in nltk: path traversal in training methods, not used here
       - name: Install Bandit
         run: pip install bandit
       - name: Run Bandit SAST
