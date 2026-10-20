@@ -38,6 +38,11 @@ jobs:
             echo "Waiting for ClickHouse... (attempt $i)"
             sleep 2
           done
+      - name: Create database via HTTP POST
+        run: |
+          curl -fsS -X POST "http://localhost:8123/" \
+            --data "CREATE DATABASE IF NOT EXISTS github_analytics"
+
       - name: Initialize ClickHouse tables
         run: python scripts/init_clickhouse.py
         env:
